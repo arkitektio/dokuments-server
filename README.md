@@ -46,11 +46,11 @@ It has no peers: it does not register with rekuest and offers no actions.
 The image is `jhnnsrs/dokuments`. It has no default command, and starting it takes two steps:
 
 ```sh
-python -m arkitekt_service migrate   # wait for the database, apply migrations, run setup
-bash run.sh                          # serve on :80 (daphne), and nothing else
+arkitekt-service run migrate   # wait for the database, apply migrations, run setup
+arkitekt-service serve                          # serve on :80 (daphne), and nothing else
 ```
 
-`run-debug.sh` does both in one go with Django's autoreloading server, for development.
+`arkitekt-service debug` does both in one go with Django's autoreloading server, for development.
 
 It needs Postgres, Redis and an S3 object store (RustFS in a standard deployment).
 
