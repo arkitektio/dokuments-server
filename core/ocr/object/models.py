@@ -1,5 +1,4 @@
-from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 import strawberry
 from pydantic import BaseModel

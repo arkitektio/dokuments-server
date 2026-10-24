@@ -2,6 +2,15 @@
 
 Notes for whoever changes this service, person or agent.
 
+## Storage
+
+Files and page images are media stores of the shared `arkitekt-datalayer` package
+(`arkitekt_datalayer`, app label `datalayer`), owned by an organization: a client asks
+`requestMediaUpload`, writes the object with the scoped credentials, `finishMediaUpload`s it, then
+files it with `fromFileLike` (or names it as a page's `image`). Reads go through
+`requestMediaAccess`; there are no presigned URLs. Every lookup -- stores, files, documents,
+pages -- is scoped to the caller's organization.
+
 ## Migrations and jobs
 
 A container of this image only serves. An installer (konstruktor) prepares the database with

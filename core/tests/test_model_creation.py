@@ -10,7 +10,9 @@ nothing flagged the drift.
 from authentikate.models import Organization
 from django.contrib.auth import get_user_model
 
-from core.models import BigFileStore, Dataset, Document, File
+from arkitekt_datalayer.models import MediaStore
+
+from core.models import Dataset, Document, File
 
 
 def test_create_dataset_file_and_document(db):
@@ -25,9 +27,7 @@ def test_create_dataset_file_and_document(db):
         organization=org,
     )
 
-    store = BigFileStore.objects.create(
-        path="s3://files/abc", key="abc", bucket="files", file_name="a.pdf", mime_type="application/pdf"
-    )
+    store = MediaStore.objects.create(organization=org, key="abc", bucket="media", original_file_name="a.pdf", content_type="application/pdf", populated=True)
     file = File.objects.create(
         name="a.pdf", dataset=dataset, store=store, creator=user, organization=org
     )

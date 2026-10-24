@@ -3,7 +3,7 @@
 
 Neither host port is pinned. Docker assigns them per run and ``tests/conftest.py``
 asks the running stack which it got, then writes them in here -- ``DATABASES`` via
-``django_db_modify_db_settings`` and ``AWS_S3_ENDPOINT_URL`` via the ``s3_endpoint``
+``django_db_modify_db_settings`` and ``DATALAYER["port"]`` via the ``s3_endpoint``
 fixture. The placeholders below only matter if you point the suite at a stack you
 started by hand.
 """
@@ -27,24 +27,30 @@ DATABASES["default"] = {
 AUTHENTIKATE = {
     **AUTHENTIKATE,
     "allow_static_tokens_in_production": True,
-    "static_tokens": {"test": {"sub": "1"}},
+    "static_tokens": {
+        "test": {"sub": "1", "roles": ["editor"]},
+        # A user in a different organization, for cross-tenant scoping tests.
+        "othertest": {"sub": "9", "org": "other_org", "roles": ["editor"]},
+    },
 }
 
 # --- object storage -------------------------------------------------------------
 # The credentials are the scoped user `initc` provisions (see
 # tests/integration/configs/rustfs.yaml), not the RustFS root pair: the suite should
-# exercise the same kind of identity the service uses in production.
-AWS_ACCESS_KEY_ID = "dokuments_access_key"
-AWS_SECRET_ACCESS_KEY = "dokuments_secret_key"
-AWS_S3_REGION_NAME = "us-east-1"
-# Placeholder -- the `s3_endpoint` fixture overwrites this with the mapped port.
-AWS_S3_ENDPOINT_URL = "http://localhost:9000"
-# RustFS is served over plain http in the test stack.
-AWS_S3_USE_SSL = False
-AWS_S3_SECURE_URLS = False
-FILE_BUCKET = "files"
-MEDIA_BUCKET = "media"
-AWS_STORAGE_BUCKET_NAME = "media"
+# exercise the same kind of identity the service uses in production. The port is a
+# placeholder -- the `s3_endpoint` fixture sets the mapped one.
+DATALAYER = {
+    "access_key": "dokuments_access_key",
+    "secret_key": "dokuments_secret_key",
+    "host": "localhost",
+    "port": 9000,
+    "protocol": "http",
+    "region": "us-east-1",
+    "role_arn": "arn:aws:iam::000000000000:role/datalayer",
+    "session_name": "dokuments-tests",
+    "media": {"bucket": "media"},
+    "upload_roles": ["admin", "editor", "bot"],
+}
 
 
 # Disable migrations for faster tests: the schema is built with run-syncdb.
@@ -65,6 +71,5 @@ logging.disable(logging.CRITICAL)
 # Redis is in the stack but the suite does not need a broker.
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 
-# The presigned-URL code caches per (bucket, key, host); an in-process cache keeps
-# tests independent of a shared redis.
+# An in-process cache keeps tests independent of a shared redis.
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}

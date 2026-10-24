@@ -1,7 +1,6 @@
 from kante.types import Info
 import strawberry
-from core import types, models, scalars, enums
-from pydantic import BaseModel
+from core import types, models
 import hashlib
 import json
 
@@ -24,7 +23,7 @@ def create_document(
 ) -> types.Document:
     document = models.Document.objects.create(
         title=input.title,
-        file_id=input.file,
+        file=models.File.objects.get(id=input.file, organization=info.context.request.organization),
     )
 
     return document

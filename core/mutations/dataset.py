@@ -1,6 +1,6 @@
 from kante.types import Info
 import strawberry
-from core import types, models, inputs
+from core import types, models
 from typing import cast
 
 

@@ -13,9 +13,9 @@ provenance extension's `on_operation` hook is async, and a sync execution fails 
 import uuid
 
 import pytest
-import requests
 from asgiref.sync import sync_to_async
-from django.conf import settings
+
+from arkitekt_datalayer.models import MediaStore
 
 from core import models
 from dokuments_server.schema import schema
@@ -33,16 +33,18 @@ FILE_QUERY = """
 
 @pytest.fixture
 def make_file(authenticated_context):
-    """Create a File backed by a BigFileStore, returning (file, store)."""
+    """Create a File backed by a media store of the caller's organization, returning (file, store)."""
 
     @sync_to_async
     def _make(key: str, body: bytes | None = None):
-        store = models.BigFileStore.objects.create(
-            path=f"s3://{settings.FILE_BUCKET}/{key}",
+        store = MediaStore.objects.create(
+            organization=authenticated_context.request.organization,
+            path=f"s3://media/{key}",
             key=key,
-            bucket=settings.FILE_BUCKET,
-            file_name="a.pdf",
-            mime_type="application/pdf",
+            bucket="media",
+            original_file_name="a.pdf",
+            content_type="application/pdf",
+            populated=True,
         )
         file = models.File.objects.create(
             name="a.pdf",
@@ -69,46 +71,7 @@ async def test_file_query_resolves_its_store(authenticated_context, make_file):
     assert not result.errors, result.errors
     assert result.data["file"]["name"] == "a.pdf"
     assert result.data["file"]["store"]["key"] == key
-    assert result.data["file"]["store"]["bucket"] == settings.FILE_BUCKET
-
-
-@pytest.mark.asyncio
-@pytest.mark.django_db(transaction=True)
-async def test_presigned_url_resolver_returns_a_working_url(
-    authenticated_context, make_file, s3_client
-):
-    """`BigFileStore.presignedUrl` is resolved by signing against the live store.
-
-    This is the whole schema-to-storage path in one assertion: the resolver reaches
-    the datalayer, the datalayer signs against RustFS, and RustFS honours the
-    signature. Against a mock the URL would be unverifiable.
-    """
-    key = uuid.uuid4().hex
-    body = b"the actual bytes behind the presigned url"
-    await sync_to_async(s3_client.put_object)(
-        Bucket=settings.FILE_BUCKET, Key=key, Body=body
-    )
-    file, _ = await make_file(key)
-
-    result = await schema.execute(
-        """
-        query File($id: ID!) {
-            file(id: $id) { store { presignedUrl } }
-        }
-        """,
-        variable_values={"id": str(file.id)},
-        context_value=authenticated_context,
-    )
-    assert not result.errors, result.errors
-
-    # The resolver calls get_presigned_url with host=None, which strips the endpoint
-    # prefix and yields a relative URL; put it back to address the running store.
-    relative = result.data["file"]["store"]["presignedUrl"]
-    response = await sync_to_async(requests.get)(
-        settings.AWS_S3_ENDPOINT_URL + relative, timeout=30
-    )
-    assert response.status_code == 200, response.text
-    assert response.content == body
+    assert result.data["file"]["store"]["bucket"] == "media"
 
 
 @pytest.mark.asyncio

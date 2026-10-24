@@ -140,19 +140,16 @@ def django_db_modify_db_settings(backend_stack):
 
 @pytest.fixture(scope="session", autouse=True)
 def s3_endpoint(backend_stack):
-    """Point the service's datalayer at the object store's mapped port.
-
-    ``settings.AWS_S3_ENDPOINT_URL`` is what ``core.datalayer.Datalayer`` builds its
-    boto3 client from, and ``get_current_datalayer()`` constructs a fresh Datalayer
-    per call, so overwriting the setting is enough -- no cached client to invalidate.
-    Autouse because the presigned-URL code also rewrites this prefix out of its
-    output, so a stale value silently corrupts URLs rather than failing.
-    """
+    """Point the service's datalayer at the object store's mapped port, and rebuild it."""
     from django.conf import settings
 
+    import arkitekt_datalayer.datalayer as dl_module
+
     _, s3_port = backend_stack
-    settings.AWS_S3_ENDPOINT_URL = f"http://localhost:{s3_port}"
-    yield settings.AWS_S3_ENDPOINT_URL
+    settings.DATALAYER = {**settings.DATALAYER, "port": s3_port}
+    dl_module.GLOBAL_DL = None
+    yield f"http://localhost:{s3_port}"
+    dl_module.GLOBAL_DL = None
 
 
 @pytest.fixture

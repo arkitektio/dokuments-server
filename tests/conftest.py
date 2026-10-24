@@ -5,6 +5,26 @@
 import pytest
 
 
+def _context(token: str, sub: str, org_slug: str):  # noqa: ANN202
+    from authentikate.models import Client, Membership, Organization, User
+    from kante.context import HttpContext, UniversalRequest
+    from strawberry.http.temporal_response import TemporalResponse
+
+    user, _ = User.objects.get_or_create(sub=sub, iss="static_issuer", defaults={"username": f"static_issuer_{sub}"})
+    client, _ = Client.objects.get_or_create(client_id="dokuments-test")
+    org, _ = Organization.objects.get_or_create(slug=org_slug)
+    membership, _ = Membership.objects.update_or_create(user=user, organization=org, defaults={"roles": ["editor"]})
+    request = UniversalRequest(_extensions={"token": token}, _client=client, _user=user, _organization=org)  # type: ignore[arg-type]
+    request.set_membership(membership)  # type: ignore[arg-type]
+    return HttpContext(request=request, response=TemporalResponse(), headers={"Authorization": f"Bearer {token}"}, type="http")
+
+
+@pytest.fixture(scope="function")
+def other_org_context(db, backend_stack):
+    """An editor of ``other_org``: the static ``othertest`` token's identity."""
+    return _context("othertest", "9", "other_org")
+
+
 @pytest.fixture(scope="function")
 def authenticated_context(db, backend_stack):
     """A context whose identity matches what the static "test" token resolves to.

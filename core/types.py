@@ -1,65 +1,13 @@
-from pydantic import BaseModel
 import strawberry
 import strawberry_django
 from strawberry import auto
-from typing import List, Optional, Annotated, Union, cast
-import strawberry_django
-from core import models, scalars, filters, enums
-from django.contrib.auth import get_user_model
-from kante.types import Info
+from typing import Optional
+from core import models, filters
 import datetime
-from asgiref.sync import sync_to_async
-from itertools import chain
 from enum import Enum
-from core.datalayer import get_current_datalayer
-from core.render.objects import models as rmodels
-from strawberry.experimental import pydantic
-from typing import Union
-from strawberry import LazyType
-from authentikate.strawberry.types import Client, User
-from koherent.strawberry.types import ProvenanceEntry
+from arkitekt_datalayer import types as dtypes
+from authentikate.strawberry.types import User
 from core.ocr.object import OCRPageResult, OCRPageResultModel
-
-
-@strawberry.type(description="Temporary Credentials for a file upload that can be used by a Client (e.g. in a python datalayer)")
-class Credentials:
-    """Temporary Credentials for a a file upload."""
-
-    status: str
-    access_key: str
-    secret_key: str
-    session_token: str
-    datalayer: str
-    bucket: str
-    key: str
-    store: str
-
-
-@strawberry.type(description="Temporary Credentials for a file upload that can be used by a Client (e.g. in a python datalayer)")
-class PresignedPostCredentials:
-    """Temporary Credentials for a a file upload."""
-
-    key: str
-    x_amz_algorithm: str
-    x_amz_credential: str
-    x_amz_date: str
-    x_amz_signature: str
-    policy: str
-    datalayer: str
-    bucket: str
-    store: str
-
-
-@strawberry.type(description="Temporary Credentials for a file download that can be used by a Client (e.g. in a python datalayer)")
-class AccessCredentials:
-    """Temporary Credentials for a a file upload."""
-
-    access_key: str
-    secret_key: str
-    session_token: str
-    bucket: str
-    key: str
-    path: str
 
 
 @strawberry.enum
@@ -76,37 +24,11 @@ class ViewKind(str, Enum):
     TIMEPOINT = "timepoint_views"
 
 
-@strawberry_django.type(models.BigFileStore)
-class BigFileStore:
-    id: auto
-    path: str
-    bucket: str
-    key: str
-
-    @strawberry_django.field()
-    def presigned_url(self, info: Info) -> str:
-        datalayer = get_current_datalayer()
-        return self.get_presigned_url(info, datalayer=datalayer)
-
-
-@strawberry_django.type(models.MediaStore)
-class MediaStore:
-    id: auto
-    path: str
-    bucket: str
-    key: str
-
-    @strawberry_django.field()
-    def presigned_url(self, info: Info, host: str | None = None) -> str:
-        datalayer = get_current_datalayer()
-        return self.get_presigned_url(info, datalayer=datalayer, host=host)
-
-
 @strawberry_django.type(models.File, filters=filters.FileFilter, pagination=True)
 class File:
     id: auto
     name: auto
-    store: BigFileStore
+    store: dtypes.MediaStore | None
     documents: list["Document"] = strawberry_django.field(
         description="The documents that reference this file",
     )
@@ -141,7 +63,7 @@ class Page:
     id: strawberry.ID
     document: "Document"
     index: int
-    image: BigFileStore
+    image: dtypes.MediaStore
     content: str = strawberry.field(description="The content of the page as a flat string.")
 
     @strawberry_django.field

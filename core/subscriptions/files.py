@@ -2,9 +2,8 @@ import logging
 from typing import AsyncGenerator
 
 import strawberry
-import strawberry_django
 from kante.types import Info
-from core import models, scalars, types, channels
+from core import models, types, channels
 
 logger = logging.getLogger(__name__)
 

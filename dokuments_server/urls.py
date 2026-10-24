@@ -15,8 +15,6 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
-from strawberry.django.views import AsyncGraphQLView
 from kante.path import dynamicpath
 
 from health_check.views import MainView

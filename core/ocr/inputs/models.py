@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 from pydantic import BaseModel
 from strawberry.experimental import pydantic as strawberry_pydantic
 import strawberry

@@ -1,5 +1,5 @@
 import strawberry
-from core import models, enums, scalars
+from core import models
 from strawberry import auto
 from typing import Optional
 from strawberry_django.filters import FilterLookup

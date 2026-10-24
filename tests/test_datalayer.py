@@ -1,172 +1,89 @@
-"""The S3 surface, exercised against the real object store in the compose stack.
+"""Files reach dokuments through arkitekt-datalayer, against the stack's real RustFS.
 
-Everything here goes over the wire to RustFS. That is the point: the code under test
-generates presigned POST forms, presigned GET URLs and STS session credentials, and
-those are precisely the parts whose correctness lives in the *server's* agreement with
-the signature -- a mock that reimplements S3 can only agree with itself.
+A grant is an STS session scoped to one key; the file is written with it, finished, then filed.
+Everything is the organization's: another organization's store, file, document or page is not
+found.
 """
 
-import io
-import uuid
-
+import boto3
 import pytest
-import requests
-from django.conf import settings
+from botocore.config import Config
+from botocore.exceptions import ClientError
 
-from core import models
-from core.datalayer import get_current_datalayer
-from core.mutations.file import (
-    RequestFileAccessInput,
-    RequestFileUploadInput,
-    request_file_access,
-    request_file_upload,
-    request_file_upload_presigned,
-)
+from dokuments_server.schema import schema
+
+REQUEST = "mutation($name: String!, $size: ByteCount) { requestMediaUpload(input: {originalFileName: $name, fileSize: $size}) { accessKey secretKey sessionToken bucket key store } }"
+FINISH = "mutation($id: String!) { finishMediaUpload(input: {storeId: $id}) { id sizeBytes } }"
+FILE = "mutation($file: FileLike!) { fromFileLike(input: {file: $file}) { id name store { id key } } }"
+ACCESS = "mutation($id: String!) { requestMediaAccess(input: {storeId: $id}) { accessKey secretKey sessionToken bucket key } }"
+GET_FILE = "query($id: ID!) { file(id: $id) { id name } }"
 
 
-def test_initc_provisioned_the_buckets(s3_client):
-    """`initc` ran and created what settings_test points at."""
-    names = {b["Name"] for b in s3_client.list_buckets()["Buckets"]}
-    assert settings.FILE_BUCKET in names
-    assert settings.MEDIA_BUCKET in names
-
-
-def test_datalayer_client_reaches_the_running_store(s3_client):
-    """The service's own Datalayer talks to the same store the fixture does."""
-    key = f"probe/{uuid.uuid4().hex}"
-    s3_client.put_object(Bucket=settings.MEDIA_BUCKET, Key=key, Body=b"probe")
-
-    s3 = get_current_datalayer().s3
-    assert s3.get_object(Bucket=settings.MEDIA_BUCKET, Key=key)["Body"].read() == b"probe"
-
-
-@pytest.mark.django_db
-def test_presigned_post_upload_round_trip(s3_client):
-    """`request_file_upload_presigned` mints a POST form that the store accepts.
-
-    The signature is verified by RustFS, not by us: a wrong policy, credential or
-    signature field comes back as a 4xx here. This is the check moto could not make.
-    """
-    creds = request_file_upload_presigned(
-        None,  # info is unused on this path
-        RequestFileUploadInput(file_name="report.pdf", datalayer="default"),
+def _grant_client(grant: dict, endpoint: str):  # noqa: ANN202
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=grant["accessKey"],
+        aws_secret_access_key=grant["secretKey"],
+        aws_session_token=grant["sessionToken"],
+        region_name="us-east-1",
+        config=Config(signature_version="s3v4"),
     )
 
+
+async def _execute(context, query: str, variables: dict, allow_errors: bool = False):  # noqa: ANN001, ANN202
+    result = await schema.execute(query, variable_values=variables, context_value=context)
+    if not allow_errors:
+        assert not result.errors, result.errors
+    return result
+
+
+async def _upload(context, endpoint: str, body: bytes, name: str = "report.pdf") -> str:  # noqa: ANN001
+    grant = (await _execute(context, REQUEST, {"name": name, "size": len(body)})).data["requestMediaUpload"]
+    _grant_client(grant, endpoint).put_object(Bucket=grant["bucket"], Key=grant["key"], Body=body)
+    finished = (await _execute(context, FINISH, {"id": grant["store"]})).data["finishMediaUpload"]
+    assert finished["sizeBytes"] == len(body)
+    return grant["store"]
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_a_file_is_uploaded_finished_and_filed(authenticated_context, s3_endpoint):
     body = b"%PDF-1.4 not really a pdf, but bytes are bytes"
-    response = requests.post(
-        settings.AWS_S3_ENDPOINT_URL + f"/{creds.bucket}",
-        data={
-            "key": creds.key,
-            "x-amz-algorithm": creds.x_amz_algorithm,
-            "x-amz-credential": creds.x_amz_credential,
-            "x-amz-date": creds.x_amz_date,
-            "x-amz-signature": creds.x_amz_signature,
-            "policy": creds.policy,
-        },
-        files={"file": ("report.pdf", body)},
-        timeout=30,
-    )
-    assert response.status_code in (200, 204), response.text
+    store = await _upload(authenticated_context, s3_endpoint, body)
 
-    stored = s3_client.get_object(Bucket=creds.bucket, Key=creds.key)["Body"].read()
-    assert stored == body
+    file = (await _execute(authenticated_context, FILE, {"file": store})).data["fromFileLike"]
+    assert file["name"] == "report.pdf" and file["store"]["id"] == store
 
-    store = models.BigFileStore.objects.get(id=creds.store)
-    assert store.key == creds.key
-    assert store.bucket == settings.FILE_BUCKET
-    assert store.file_name == "report.pdf"
-    assert store.mime_type == "application/pdf"
+    access = (await _execute(authenticated_context, ACCESS, {"id": store})).data["requestMediaAccess"]
+    assert _grant_client(access, s3_endpoint).get_object(Bucket=access["bucket"], Key=access["key"])["Body"].read() == body
 
 
-@pytest.mark.django_db
-def test_bigfilestore_presigned_url_downloads_the_bytes(s3_client):
-    """`BigFileStore.get_presigned_url` produces a URL the store honours."""
-    key = uuid.uuid4().hex
-    body = b"downloadable content"
-    s3_client.put_object(Bucket=settings.FILE_BUCKET, Key=key, Body=body)
-
-    store = models.BigFileStore.objects.create(
-        path=f"s3://{settings.FILE_BUCKET}/{key}",
-        key=key,
-        bucket=settings.FILE_BUCKET,
-        file_name="thing.txt",
-        mime_type="text/plain",
-    )
-
-    # `host=None` makes get_presigned_url strip the endpoint prefix and return a
-    # relative URL, so put it back to address the running store.
-    relative = store.get_presigned_url(None, datalayer=get_current_datalayer())
-    response = requests.get(settings.AWS_S3_ENDPOINT_URL + relative, timeout=30)
-    assert response.status_code == 200, response.text
-    assert response.content == body
-    # The download disposition the resolver sets is what makes a browser save it.
-    assert 'filename="thing.txt"' in response.headers.get("content-disposition", "")
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_a_grant_writes_only_its_own_key(authenticated_context, s3_endpoint):
+    grant = (await _execute(authenticated_context, REQUEST, {"name": "a.pdf"})).data["requestMediaUpload"]
+    s3 = _grant_client(grant, s3_endpoint)
+    with pytest.raises(ClientError):
+        s3.put_object(Bucket=grant["bucket"], Key="someone-else", Body=b"x")
+    s3.put_object(Bucket=grant["bucket"], Key=grant["key"], Body=b"abc")
 
 
-@pytest.mark.django_db
-def test_mediastore_put_file_uploads(s3_client):
-    """`MediaStore.put_file` pushes a file object into the store."""
-    key = uuid.uuid4().hex
-    store = models.MediaStore.objects.create(
-        path=f"s3://{settings.MEDIA_BUCKET}/{key}", key=key, bucket=settings.MEDIA_BUCKET
-    )
-
-    store.put_file(get_current_datalayer(), io.BytesIO(b"an image, allegedly"))
-
-    assert s3_client.get_object(Bucket=settings.MEDIA_BUCKET, Key=key)["Body"].read() == b"an image, allegedly"
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_an_unfinished_upload_cannot_be_filed(authenticated_context, s3_endpoint):
+    grant = (await _execute(authenticated_context, REQUEST, {"name": "a.pdf"})).data["requestMediaUpload"]
+    refused = await _execute(authenticated_context, FILE, {"file": grant["store"]}, allow_errors=True)
+    assert refused.errors and "has not been finished" in refused.errors[0].message
 
 
-@pytest.mark.django_db
-def test_sts_scoped_credentials_can_read_the_object(s3_client):
-    """`request_file_access` returns STS credentials the store actually accepts.
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_another_organization_sees_neither_the_store_nor_the_file(authenticated_context, other_org_context, s3_endpoint):
+    store = await _upload(authenticated_context, s3_endpoint, b"mine")
+    file = (await _execute(authenticated_context, FILE, {"file": store})).data["fromFileLike"]
 
-    Exercises the AssumeRole branch end to end: mint a session, then use it as a
-    separate client. A mock would hand back plausible-looking strings that no server
-    ever validates.
-    """
-    import boto3
-
-    key = uuid.uuid4().hex
-    s3_client.put_object(Bucket=settings.FILE_BUCKET, Key=key, Body=b"scoped read")
-    store = models.BigFileStore.objects.create(
-        path=f"s3://{settings.FILE_BUCKET}/{key}",
-        key=key,
-        bucket=settings.FILE_BUCKET,
-        file_name="scoped.txt",
-        mime_type="text/plain",
-    )
-
-    creds = request_file_access(None, RequestFileAccessInput(store=str(store.id), duration=900))
-
-    scoped = boto3.client(
-        "s3",
-        endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-        aws_access_key_id=creds.access_key,
-        aws_secret_access_key=creds.secret_key,
-        aws_session_token=creds.session_token,
-        region_name=settings.AWS_S3_REGION_NAME,
-    )
-    assert scoped.get_object(Bucket=creds.bucket, Key=creds.key)["Body"].read() == b"scoped read"
-
-
-@pytest.mark.django_db
-def test_request_file_upload_returns_usable_session(s3_client):
-    """The non-presigned upload path: STS credentials that can write the key."""
-    import boto3
-
-    creds = request_file_upload(
-        None, RequestFileUploadInput(file_name="notes.txt", datalayer="default")
-    )
-
-    scoped = boto3.client(
-        "s3",
-        endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-        aws_access_key_id=creds.access_key,
-        aws_secret_access_key=creds.secret_key,
-        aws_session_token=creds.session_token,
-        region_name=settings.AWS_S3_REGION_NAME,
-    )
-    scoped.put_object(Bucket=creds.bucket, Key=creds.key, Body=b"written with a session")
-
-    assert s3_client.get_object(Bucket=creds.bucket, Key=creds.key)["Body"].read() == b"written with a session"
-    assert models.BigFileStore.objects.filter(id=creds.store).exists()
+    assert (await _execute(other_org_context, FILE, {"file": store}, allow_errors=True)).errors
+    assert (await _execute(other_org_context, ACCESS, {"id": store}, allow_errors=True)).errors
+    assert (await _execute(other_org_context, GET_FILE, {"id": file["id"]}, allow_errors=True)).errors
+    assert (await _execute(authenticated_context, GET_FILE, {"id": file["id"]})).data["file"]["id"] == file["id"]
