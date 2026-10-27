@@ -50,6 +50,10 @@ class Mutation:
     # Uploads (arkitekt_datalayer): request a grant, write the file to S3, finish, then file it.
     request_media_upload = upload_mutation(resolver=datalayer_mutations.request_media_upload, description="Request temporary S3 credentials to upload one file (a document, or a page's image).")
     finish_media_upload = upload_mutation(resolver=datalayer_mutations.finish_media_upload, description="Finalize an upload after the client has written the object.")
+    refresh_media_upload = upload_mutation(
+        description="Reissue upload credentials for a media upload still in flight, to the same key, so a write that outlives its credentials carries on. Only the uploader may, never for a finished store, and never past the upload's time limit",
+        resolver=datalayer_mutations.refresh_media_upload,
+    )
     request_media_access = strawberry_django.mutation(resolver=datalayer_mutations.request_media_access, description="Request temporary S3 read credentials for an uploaded file.")
     request_general_media_access = strawberry_django.mutation(resolver=datalayer_mutations.request_general_media_access, description="Request temporary S3 read credentials for the organization's files.")
 

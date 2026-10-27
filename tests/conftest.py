@@ -12,7 +12,7 @@ def _context(token: str, sub: str, org_slug: str):  # noqa: ANN202
 
     user, _ = User.objects.get_or_create(sub=sub, iss="static_issuer", defaults={"username": f"static_issuer_{sub}"})
     client, _ = Client.objects.get_or_create(client_id="dokuments-test")
-    org, _ = Organization.objects.get_or_create(slug=org_slug)
+    org, _ = Organization.objects.get_or_create(identifier=f"static_issuer#{org_slug}")
     membership, _ = Membership.objects.update_or_create(user=user, organization=org, defaults={"roles": ["editor"]})
     request = UniversalRequest(_extensions={"token": token}, _client=client, _user=user, _organization=org)  # type: ignore[arg-type]
     request.set_membership(membership)  # type: ignore[arg-type]
@@ -42,7 +42,7 @@ def authenticated_context(db, backend_stack):
         sub="1", iss="static_issuer", defaults={"username": "static_issuer_1"}
     )
     client, _ = Client.objects.get_or_create(client_id="dokuments-test")
-    org, _ = Organization.objects.get_or_create(slug="static_org")
+    org, _ = Organization.objects.get_or_create(identifier="static_issuer#static_org")
     membership, _ = Membership.objects.get_or_create(user=user, organization=org)
 
     request = UniversalRequest(

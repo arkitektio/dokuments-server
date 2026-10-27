@@ -12,7 +12,7 @@ from botocore.exceptions import ClientError
 
 from dokuments_server.schema import schema
 
-REQUEST = "mutation($name: String!, $size: ByteCount) { requestMediaUpload(input: {originalFileName: $name, fileSize: $size}) { accessKey secretKey sessionToken bucket key store } }"
+REQUEST = "mutation($name: String!, $size: ByteCount!) { requestMediaUpload(input: {originalFileName: $name, fileSize: $size}) { accessKey secretKey sessionToken bucket key store } }"
 FINISH = "mutation($id: String!) { finishMediaUpload(input: {storeId: $id}) { id sizeBytes } }"
 FILE = "mutation($file: FileLike!) { fromFileLike(input: {file: $file}) { id name store { id key } } }"
 ACCESS = "mutation($id: String!) { requestMediaAccess(input: {storeId: $id}) { accessKey secretKey sessionToken bucket key } }"
@@ -62,7 +62,7 @@ async def test_a_file_is_uploaded_finished_and_filed(authenticated_context, s3_e
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_a_grant_writes_only_its_own_key(authenticated_context, s3_endpoint):
-    grant = (await _execute(authenticated_context, REQUEST, {"name": "a.pdf"})).data["requestMediaUpload"]
+    grant = (await _execute(authenticated_context, REQUEST, {"name": "a.pdf", "size": 3})).data["requestMediaUpload"]
     s3 = _grant_client(grant, s3_endpoint)
     with pytest.raises(ClientError):
         s3.put_object(Bucket=grant["bucket"], Key="someone-else", Body=b"x")
@@ -72,7 +72,7 @@ async def test_a_grant_writes_only_its_own_key(authenticated_context, s3_endpoin
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_an_unfinished_upload_cannot_be_filed(authenticated_context, s3_endpoint):
-    grant = (await _execute(authenticated_context, REQUEST, {"name": "a.pdf"})).data["requestMediaUpload"]
+    grant = (await _execute(authenticated_context, REQUEST, {"name": "a.pdf", "size": 3})).data["requestMediaUpload"]
     refused = await _execute(authenticated_context, FILE, {"file": grant["store"]}, allow_errors=True)
     assert refused.errors and "has not been finished" in refused.errors[0].message
 

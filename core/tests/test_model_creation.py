@@ -18,7 +18,7 @@ from core.models import Dataset, Document, File
 def test_create_dataset_file_and_document(db):
     """A Dataset -> File -> Document chain persists with its relations intact."""
     user = get_user_model().objects.create_user(username="testuser", password="123456789")
-    org = Organization.objects.create(slug="testorg")
+    org = Organization.objects.create(identifier="static_issuer#testorg")
 
     dataset = Dataset.objects.create(
         name="Test Dataset",
