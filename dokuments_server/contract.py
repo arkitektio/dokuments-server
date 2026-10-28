@@ -7,15 +7,27 @@ the same commit, and no installer has to learn of it.
 
 from __future__ import annotations
 
-from arkitekt_service.contract import JSON, Contract, Description, Facts, Job, Needs, Offers, Scope, Start, blocks
+from arkitekt_service.contract import JSON, Contract, Description, Facts, Job, Needs, Offers, Role, Scope, Start, blocks
 
 from dokuments_server.configuration import Settings
 
-#: What a token may be allowed to do here: defined at the coordination server when the hub enrols.
+#: What an app may do here on a user's behalf: defined at the coordination server when the hub
+#: enrols. Every root field of the schema asks for one of them (`AuthExtension(scopes=...)`).
 SCOPES = [
-    Scope(key="dokuments_read", description="Read documents, their pages and their text"),
-    Scope(key="dokuments_write", description="Add documents and write their pages and text"),
+    Scope(key="dokuments_read", description="Read documents, their pages and their extracted text."),
+    Scope(key="dokuments_write", description="Upload documents and add or change their pages and text."),
+    Scope(key="dokuments_all", description="Do everything in Dokuments on your behalf.", is_all_scope=True),
 ]
+
+#: What a member of an organization may do here.
+ROLES = [
+    Role(key="dokuments_admin", description="Full control of Dokuments in this organization.", is_admin_role=True),
+    Role(key="dokuments_editor", description="Upload and change documents.", is_default_role=True),
+]
+
+#: The role every write asks for.
+EDITOR = "dokuments_editor"
+ADMIN = "dokuments_admin"
 
 
 def render(facts: Facts) -> dict[str, JSON]:
@@ -30,7 +42,7 @@ contract = Contract(
         name="dokuments",
         identifier="live.arkitekt.dokuments",
         summary="Documents, their pages and their text.",
-        needs=Needs(scopes=SCOPES, storage=["media"]),
+        needs=Needs(scopes=SCOPES, roles=ROLES, storage=["media"]),
         offers=Offers(),
     ),
     settings=Settings,

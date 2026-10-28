@@ -13,7 +13,7 @@ def _context(token: str, sub: str, org_slug: str):  # noqa: ANN202
     user, _ = User.objects.get_or_create(sub=sub, iss="static_issuer", defaults={"username": f"static_issuer_{sub}"})
     client, _ = Client.objects.get_or_create(client_id="dokuments-test")
     org, _ = Organization.objects.get_or_create(identifier=f"static_issuer#{org_slug}")
-    membership, _ = Membership.objects.update_or_create(user=user, organization=org, defaults={"roles": ["editor"]})
+    membership, _ = Membership.objects.update_or_create(user=user, organization=org, defaults={"roles": ["dokuments_editor"]})
     request = UniversalRequest(_extensions={"token": token}, _client=client, _user=user, _organization=org)  # type: ignore[arg-type]
     request.set_membership(membership)  # type: ignore[arg-type]
     return HttpContext(request=request, response=TemporalResponse(), headers={"Authorization": f"Bearer {token}"}, type="http")

@@ -24,13 +24,21 @@ DATABASES["default"] = {
 
 # Django forces DEBUG=False under the test runner, and authentikate 3.0 refuses static
 # tokens when DEBUG is False. These are deliberate test fixtures, so opt in explicitly.
+#: What a test token is unless it says otherwise: dokuments' admin, through an app granted all of dokuments.
+ADMIN_WITH_EVERY_SCOPE = {"roles": ["dokuments_admin"], "scope": "openid dokuments_all"}
+
 AUTHENTIKATE = {
     **AUTHENTIKATE,
     "allow_static_tokens_in_production": True,
     "static_tokens": {
-        "test": {"sub": "1", "roles": ["editor"]},
-        # A user in a different organization, for cross-tenant scoping tests.
-        "othertest": {"sub": "9", "org": "other_org", "roles": ["editor"]},
+        name: {**ADMIN_WITH_EVERY_SCOPE, **token}
+        for name, token in {
+            "test": {"sub": "1", "roles": ["dokuments_editor"]},
+            # A user in a different organization, for cross-tenant scoping tests.
+            "othertest": {"sub": "9", "org": "other_org", "roles": ["dokuments_editor"]},
+            # An app granted only what it reads, for the scope tests (tests/test_scopes.py).
+            "readertest": {"sub": "1", "scope": "openid dokuments_read"},
+        }.items()
     },
 }
 
@@ -49,7 +57,6 @@ DATALAYER = {
     "role_arn": "arn:aws:iam::000000000000:role/datalayer",
     "session_name": "dokuments-tests",
     "media": {"bucket": "media"},
-    "upload_roles": ["admin", "editor", "bot"],
 }
 
 
