@@ -5,6 +5,7 @@ import strawberry
 from arkitekt_datalayer import mutations as datalayer_mutations
 from arkitekt_datalayer import scalars as datalayer_scalars
 from arkitekt_datalayer.datalayer import load_config
+from arkitekt_service.graphql import TelemetryExtension
 from authentikate.strawberry import AuthExtension, AuthSubscribeExtension
 from strawberry.schema.config import StrawberryConfig
 from strawberry import ID as StrawberryID
@@ -110,6 +111,7 @@ schema = Schema(
     subscription=Subscription,
     mutation=Mutation,
     extensions=[
+        TelemetryExtension,
         KoherentExtension,
         AuthentikateExtension,
         DjangoOptimizerExtension,
