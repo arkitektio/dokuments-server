@@ -15,6 +15,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.http import HttpRequest, HttpResponse
 from kante.path import dynamicpath
 
 from arkitekt_service.service.views import answers_challenge
@@ -22,7 +23,15 @@ from health_check.views import MainView
 from django.views.decorators.csrf import csrf_exempt
 
 
+def graphql_schema(request: HttpRequest) -> HttpResponse:
+    """The schema as SDL, readable without a login (clients generate and validate against it)."""
+    from .schema import schema
+
+    return HttpResponse(content=schema.as_str(), content_type="text/plain")
+
+
 urlpatterns = [
     dynamicpath("admin/", admin.site.urls),
+    dynamicpath("schema", graphql_schema),
     dynamicpath("ht", answers_challenge(csrf_exempt(MainView.as_view())), name="health_check"),
 ]
