@@ -35,3 +35,8 @@ roi_channel = build_channel(
 file_channel = build_channel(
     FileSignal
 )
+
+
+def org_files_group(organization_id: object) -> str:
+    """The group a file's events go to: its organization's."""
+    return f"files_org_{organization_id}"

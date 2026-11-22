@@ -40,15 +40,20 @@ class FileFilter(IDFilterMixin, SearchFilterMixin):
 
 
 @strawberry_django.filter(models.Document)
-class DocumentFilter(IDFilterMixin, SearchFilterMixin):
+class DocumentFilter(IDFilterMixin):
     id: auto
-    name: Optional[FilterLookup[str]]
+    search: str | None
+
+    def filter_search(self, queryset, info):
+        """A case-insensitive substring of the title: a document has a title, not a name."""
+        if self.search is None:
+            return queryset
+        return queryset.filter(title__icontains=self.search)
 
 
 @strawberry_django.filter(models.Page)
 class PageFilter(IDFilterMixin):
     id: auto
-    name: Optional[FilterLookup[str]]
     search: str | None
 
     def filter_search(self, queryset, info):
