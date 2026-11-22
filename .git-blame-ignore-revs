@@ -1,0 +1,3 @@
+# Formatting-only commits: git blame skips them (git config blame.ignoreRevsFile .git-blame-ignore-revs; GitHub does it by itself).
+# style: adopt the arkitekt Python standard (line length 88)
+d8dd78cc88fc9568b6d8575cac76aa149aec10e9
