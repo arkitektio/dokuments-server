@@ -14,7 +14,7 @@ from django.contrib.auth import get_user_model
 from core.models import Dataset, Document, File
 
 
-def test_create_dataset_file_and_document(db):
+def test_create_dataset_file_and_document(db: None) -> None:
     """A Dataset -> File -> Document chain persists with its relations intact."""
     user = get_user_model().objects.create_user(
         username="testuser", password="123456789"
@@ -50,7 +50,7 @@ def test_create_dataset_file_and_document(db):
     assert list(file.documents.all()) == [document]
 
 
-def test_dataset_requires_an_organization(db):
+def test_dataset_requires_an_organization(db: None) -> None:
     """`Dataset.organization` is non-null -- tenancy is not optional."""
     import pytest
     from django.db.utils import IntegrityError

@@ -7,8 +7,11 @@ found.
 
 import boto3
 import pytest
+from botocore.client import BaseClient
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from kante.context import HttpContext
+from strawberry.types import ExecutionResult
 
 from dokuments_server.schema import schema
 
@@ -19,7 +22,7 @@ ACCESS = "mutation($id: String!) { requestMediaAccess(input: {storeId: $id}) { a
 GET_FILE = "query($id: ID!) { file(id: $id) { id name } }"
 
 
-def _grant_client(grant: dict, endpoint: str):  # noqa: ANN202
+def _grant_client(grant: dict, endpoint: str) -> BaseClient:
     return boto3.client(
         "s3",
         endpoint_url=endpoint,
@@ -31,7 +34,9 @@ def _grant_client(grant: dict, endpoint: str):  # noqa: ANN202
     )
 
 
-async def _execute(context, query: str, variables: dict, allow_errors: bool = False):  # noqa: ANN001, ANN202
+async def _execute(
+    context: HttpContext, query: str, variables: dict, allow_errors: bool = False
+) -> ExecutionResult:
     result = await schema.execute(
         query, variable_values=variables, context_value=context
     )
@@ -40,7 +45,9 @@ async def _execute(context, query: str, variables: dict, allow_errors: bool = Fa
     return result
 
 
-async def _upload(context, endpoint: str, body: bytes, name: str = "report.pdf") -> str:  # noqa: ANN001
+async def _upload(
+    context: HttpContext, endpoint: str, body: bytes, name: str = "report.pdf"
+) -> str:
     grant = (await _execute(context, REQUEST, {"name": name, "size": len(body)})).data[
         "requestMediaUpload"
     ]
@@ -57,8 +64,8 @@ async def _upload(context, endpoint: str, body: bytes, name: str = "report.pdf")
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_a_file_is_uploaded_finished_and_filed(
-    authenticated_context, s3_endpoint
-):
+    authenticated_context: HttpContext, s3_endpoint: str
+) -> None:
     body = b"%PDF-1.4 not really a pdf, but bytes are bytes"
     store = await _upload(authenticated_context, s3_endpoint, body)
 
@@ -80,7 +87,9 @@ async def test_a_file_is_uploaded_finished_and_filed(
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
-async def test_a_grant_writes_only_its_own_key(authenticated_context, s3_endpoint):
+async def test_a_grant_writes_only_its_own_key(
+    authenticated_context: HttpContext, s3_endpoint: str
+) -> None:
     grant = (
         await _execute(authenticated_context, REQUEST, {"name": "a.pdf", "size": 3})
     ).data["requestMediaUpload"]
@@ -92,7 +101,9 @@ async def test_a_grant_writes_only_its_own_key(authenticated_context, s3_endpoin
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
-async def test_an_unfinished_upload_cannot_be_filed(authenticated_context, s3_endpoint):
+async def test_an_unfinished_upload_cannot_be_filed(
+    authenticated_context: HttpContext, s3_endpoint: str
+) -> None:
     grant = (
         await _execute(authenticated_context, REQUEST, {"name": "a.pdf", "size": 3})
     ).data["requestMediaUpload"]
@@ -105,8 +116,8 @@ async def test_an_unfinished_upload_cannot_be_filed(authenticated_context, s3_en
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_another_organization_sees_neither_the_store_nor_the_file(
-    authenticated_context, other_org_context, s3_endpoint
-):
+    authenticated_context: HttpContext, other_org_context: HttpContext, s3_endpoint: str
+) -> None:
     store = await _upload(authenticated_context, s3_endpoint, b"mine")
     file = (await _execute(authenticated_context, FILE, {"file": store})).data[
         "fromFileLike"
@@ -134,8 +145,8 @@ GENERAL = "mutation { requestGeneralMediaAccess(input: {}) { accessKey secretKey
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_one_general_grant_reads_every_store_of_the_organization(
-    authenticated_context, other_org_context, s3_endpoint
-):
+    authenticated_context: HttpContext, other_org_context: HttpContext, s3_endpoint: str
+) -> None:
     """What a client signs page images with: one grant per session, not one per store."""
     first = await _upload(
         authenticated_context, s3_endpoint, b"page one", name="p1.png"

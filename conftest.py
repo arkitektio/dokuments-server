@@ -9,13 +9,17 @@ whichever directory happened to be collected first.
 
 import os
 import time
+from collections.abc import Iterator
 
 import boto3
 import psycopg
 import pytest
+from botocore.client import BaseClient
+from django.apps import AppConfig
 from django.contrib.contenttypes.management import create_contenttypes
 from django.db.models.signals import post_migrate
 from dokker import PortNotFoundError, testing
+from pytest_django import DjangoDbBlocker
 
 # This file sits at the repo root, so the compose file is under tests/.
 COMPOSE = os.path.join(
@@ -29,7 +33,7 @@ BUCKETS = ("media", "files")
 
 
 @pytest.fixture(scope="session")
-def backend_stack():
+def backend_stack() -> Iterator[tuple[int, int]]:
     """Bring up the stack and yield the host ports docker assigned.
 
     Neither port is fixed: the compose file publishes 5432 and 9000 with no host
@@ -120,7 +124,7 @@ def _wait_for_buckets(port: int, deadline: float) -> None:
         time.sleep(0.2)
 
 
-def _client(port: int):
+def _client(port: int) -> BaseClient:
     return boto3.client(
         "s3",
         endpoint_url=f"http://localhost:{port}",
@@ -131,7 +135,7 @@ def _client(port: int):
 
 
 @pytest.fixture(scope="session")
-def django_db_modify_db_settings(backend_stack):
+def django_db_modify_db_settings(backend_stack: tuple[int, int]) -> Iterator[None]:
     """Point Django at the postgres port the stack came up on.
 
     pytest-django calls this before creating the test database, which is the only
@@ -146,7 +150,7 @@ def django_db_modify_db_settings(backend_stack):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def s3_endpoint(backend_stack):
+def s3_endpoint(backend_stack: tuple[int, int]) -> Iterator[str]:
     """Point the service's datalayer at the object store's mapped port, and rebuild it."""
     import arkitekt_datalayer.datalayer as dl_module
     from django.conf import settings
@@ -159,14 +163,16 @@ def s3_endpoint(backend_stack):
 
 
 @pytest.fixture
-def s3_client(backend_stack, s3_endpoint):
+def s3_client(backend_stack: tuple[int, int], s3_endpoint: str) -> BaseClient:
     """boto3 client for the real object store, as the provisioned scoped user."""
     _, s3_port = backend_stack
     return _client(s3_port)
 
 
 @pytest.fixture(scope="session")
-def django_db_setup(django_db_setup, django_db_blocker):
+def django_db_setup(
+    django_db_setup: None, django_db_blocker: DjangoDbBlocker
+) -> Iterator[None]:
     # Every transaction=True test teardown flushes the DB and re-fires post_migrate,
     # which rebuilds all contenttypes and permissions from the model registry. The
     # rows never change between tests, so snapshot them once and swap the rebuild for
@@ -184,7 +190,7 @@ def django_db_setup(django_db_setup, django_db_blocker):
     )
     post_migrate.disconnect(create_contenttypes)
 
-    def restore(sender, **kwargs):
+    def restore(sender: AppConfig, **kwargs: object) -> None:
         if getattr(sender, "label", None) != "contenttypes":
             return
         ContentType.objects.bulk_create(contenttypes, ignore_conflicts=True)

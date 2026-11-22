@@ -6,6 +6,7 @@ import pytest
 from arkitekt_service.graphql import scope_gaps
 from kante.context import HttpContext, UniversalRequest
 from strawberry.http.temporal_response import TemporalResponse
+from strawberry.types import ExecutionResult
 
 from dokuments_server.schema import schema
 
@@ -22,17 +23,19 @@ def _as(token: str) -> HttpContext:
     )
 
 
-def _reason(result) -> str | None:  # noqa: ANN001
+def _reason(result: ExecutionResult) -> str | None:
     return result.errors[0].extensions.get("reason") if result.errors else None
 
 
-def test_every_root_field_asks_for_a_scope_dokuments_declares():
+def test_every_root_field_asks_for_a_scope_dokuments_declares() -> None:
     assert scope_gaps(schema) == []
 
 
 @pytest.mark.django_db
 @pytest.mark.asyncio
-async def test_an_app_granted_reads_reads_and_writes_nothing(backend_stack):
+async def test_an_app_granted_reads_reads_and_writes_nothing(
+    backend_stack: tuple[int, int],
+) -> None:
     assert (await schema.execute(FILES, context_value=_as("readertest"))).errors is None
     refused = await schema.execute(REQUEST_UPLOAD, context_value=_as("readertest"))
     assert _reason(refused) == "INSUFFICIENT_SCOPE"
@@ -40,7 +43,7 @@ async def test_an_app_granted_reads_reads_and_writes_nothing(backend_stack):
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
-async def test_an_editor_through_the_all_scope_uploads(s3_endpoint):
+async def test_an_editor_through_the_all_scope_uploads(s3_endpoint: str) -> None:
     """``test`` is an editor: no ``upload_roles`` are configured, so uploads fall back to ``dokuments_editor``."""
     made = await schema.execute(REQUEST_UPLOAD, context_value=_as("test"))
     assert made.errors is None, made.errors

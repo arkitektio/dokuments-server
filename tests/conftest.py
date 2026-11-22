@@ -3,9 +3,10 @@
 """
 
 import pytest
+from kante.context import HttpContext
 
 
-def _context(token: str, sub: str, org_slug: str):  # noqa: ANN202
+def _context(token: str, sub: str, org_slug: str) -> HttpContext:
     from authentikate.models import Client, Membership, Organization, User
     from kante.context import HttpContext, UniversalRequest
     from strawberry.http.temporal_response import TemporalResponse
@@ -34,13 +35,13 @@ def _context(token: str, sub: str, org_slug: str):  # noqa: ANN202
 
 
 @pytest.fixture(scope="function")
-def other_org_context(db, backend_stack):
+def other_org_context(db: None, backend_stack: tuple[int, int]) -> HttpContext:
     """An editor of ``other_org``: the static ``othertest`` token's identity."""
     return _context("othertest", "9", "other_org")
 
 
 @pytest.fixture(scope="function")
-def authenticated_context(db, backend_stack):
+def authenticated_context(db: None, backend_stack: tuple[int, int]) -> HttpContext:
     """A context whose identity matches what the static "test" token resolves to.
 
     The schema's authentikate extension authenticates as that identity at resolve

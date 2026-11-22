@@ -1,4 +1,4 @@
-from typing import Literal, Union
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -32,7 +32,7 @@ class GridNodeModel(RenderNodeModel):
     label: str | None = None
 
 
-RenderNodeUnion = Union[ContextNodeModel, OverlayNodeModel, GridNodeModel]
+RenderNodeUnion = ContextNodeModel | OverlayNodeModel | GridNodeModel
 
 
 class TreeModel(BaseModel):

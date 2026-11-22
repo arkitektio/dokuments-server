@@ -16,7 +16,12 @@ def _broadcast_file(signal: channels.FileSignal, file: models.File) -> None:
 
 
 @receiver(post_save, sender=models.File)
-def my_file_handler(sender, instance=None, created=None, **kwargs):
+def my_file_handler(
+    sender: type[models.File],
+    instance: models.File,
+    created: bool = False,
+    **kwargs: object,
+) -> None:
     if created:
         _broadcast_file(channels.FileSignal(create=instance.id), instance)
     else:
@@ -24,5 +29,7 @@ def my_file_handler(sender, instance=None, created=None, **kwargs):
 
 
 @receiver(pre_delete, sender=models.File)
-def my_file_delete_handler(sender, instance=None, **kwargs):
+def my_file_delete_handler(
+    sender: type[models.File], instance: models.File, **kwargs: object
+) -> None:
     _broadcast_file(channels.FileSignal(delete=instance.id), instance)

@@ -11,10 +11,13 @@ provenance extension's `on_operation` hook is async, and a sync execution fails 
 """
 
 import uuid
+from collections.abc import Awaitable
+from typing import Protocol
 
 import pytest
 from arkitekt_datalayer.models import MediaStore
 from asgiref.sync import sync_to_async
+from kante.context import HttpContext
 
 from core import models
 from dokuments_server.schema import schema
@@ -30,12 +33,20 @@ FILE_QUERY = """
 """
 
 
+class MakeFile(Protocol):
+    """Creates a File backed by a media store of the caller's organization."""
+
+    def __call__(
+        self, key: str, body: bytes | None = None
+    ) -> Awaitable[tuple[models.File, MediaStore]]: ...
+
+
 @pytest.fixture
-def make_file(authenticated_context):
+def make_file(authenticated_context: HttpContext) -> MakeFile:
     """Create a File backed by a media store of the caller's organization, returning (file, store)."""
 
     @sync_to_async
-    def _make(key: str, body: bytes | None = None):
+    def _make(key: str, body: bytes | None = None) -> tuple[models.File, MediaStore]:
         store = MediaStore.objects.create(
             organization=authenticated_context.request.organization,
             path=f"s3://media/{key}",
@@ -58,7 +69,9 @@ def make_file(authenticated_context):
 
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
-async def test_file_query_resolves_its_store(authenticated_context, make_file):
+async def test_file_query_resolves_its_store(
+    authenticated_context: HttpContext, make_file: MakeFile
+) -> None:
     """A File created through the ORM is readable through the schema."""
     key = uuid.uuid4().hex
     file, store = await make_file(key)
@@ -78,13 +91,13 @@ async def test_file_query_resolves_its_store(authenticated_context, make_file):
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
 async def test_document_and_pages_traverse_back_to_the_file(
-    authenticated_context, make_file
-):
+    authenticated_context: HttpContext, make_file: MakeFile
+) -> None:
     """Document -> pages -> image walks the relations the OCR pipeline writes."""
     file, store = await make_file(uuid.uuid4().hex)
 
     @sync_to_async
-    def _make_doc():
+    def _make_doc() -> models.Document:
         document = models.Document.objects.create(file=file, title="Scanned report")
         models.Page.objects.create(
             document=document, index=0, content="page one", image=store

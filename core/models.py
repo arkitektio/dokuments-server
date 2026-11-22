@@ -1,5 +1,6 @@
 from authentikate.models import Organization
 from django.contrib.auth import get_user_model
+from django.contrib.auth.base_user import AbstractBaseUser
 from django.db import models
 from koherent.fields import ProvenanceField
 from taggit.managers import TaggableManager
@@ -8,7 +9,9 @@ from taggit.managers import TaggableManager
 
 
 class DatasetManager(models.Manager):
-    def get_current_default_for_user_and_organization(self, user, organization):
+    def get_current_default_for_user_and_organization(
+        self, user: AbstractBaseUser, organization: Organization
+    ) -> "Dataset":
         potential = self.filter(
             creator=user, organization=organization, is_default=True
         ).first()
@@ -129,7 +132,7 @@ class Page(models.Model):
     )
     ocr_result = models.JSONField(null=True, blank=True)
 
-    def get_text(self):
+    def get_text(self) -> str:
         """Concatenate recognized lines into full-page text"""
         if not self.ocr_result:
             return ""

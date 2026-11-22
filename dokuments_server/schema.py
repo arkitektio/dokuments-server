@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 import strawberry
 import strawberry_django
@@ -24,12 +24,14 @@ ID = Annotated[
 ]
 
 
-def field(scope: str = "dokuments_read", **kwargs):  # noqa: ANN003, ANN201
+def field(scope: str = "dokuments_read", **kwargs: Any) -> Any:  # noqa: ANN401 - as strawberry_django's: the value of `x: T = field()`
     "A field an app needs ``scope`` for (``dokuments_read``, unless it says otherwise)."
     return strawberry_django.field(extensions=[AuthExtension(scopes=[scope])], **kwargs)
 
 
-def mutation(scope: str = "dokuments_write", roles: list[str] | None = None, **kwargs):  # noqa: ANN003, ANN201
+def mutation(
+    scope: str = "dokuments_write", roles: list[str] | None = None, **kwargs: Any
+) -> Any:  # noqa: ANN401 - as strawberry_django's: the value of `x: T = field()`
     """A write: an app needs ``scope`` for it, a member one of ``roles`` (``dokuments_editor`` unless it
     says otherwise; ``dokuments_admin`` holds every role)."""
     return strawberry_django.mutation(
@@ -38,14 +40,14 @@ def mutation(scope: str = "dokuments_write", roles: list[str] | None = None, **k
     )
 
 
-def access_mutation(**kwargs):  # noqa: ANN003, ANN201
+def access_mutation(**kwargs: Any) -> Any:  # noqa: ANN401 - as strawberry_django's: the value of `x: T = field()`
     """A mutation that hands out read credentials: a read, for whoever may see what it reads."""
     return strawberry_django.mutation(
         extensions=[AuthExtension(scopes=["dokuments_read"])], **kwargs
     )
 
 
-def subscription(**kwargs):  # noqa: ANN003, ANN201
+def subscription(**kwargs: Any) -> Any:  # noqa: ANN401 - as strawberry_django's: the value of `x: T = field()`
     """A subscription: what it streams is read, so an app needs ``dokuments_read`` for it."""
     return strawberry.subscription(
         extensions=[AuthSubscribeExtension(scopes=["dokuments_read"])], **kwargs
@@ -77,7 +79,7 @@ class Query:
         )
 
 
-def upload_mutation(**kwargs):  # noqa: ANN003, ANN201
+def upload_mutation(**kwargs: Any) -> Any:  # noqa: ANN401 - as strawberry_django's: the value of `x: T = field()`
     """A mutation that hands out or finishes upload credentials: an app needs ``dokuments_write`` for it,
     a member one of ``datalayer.upload_roles`` (``dokuments_editor`` when none are configured)."""
     roles = load_config().upload_roles or [EDITOR]

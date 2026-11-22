@@ -7,7 +7,7 @@ from kante.types import Info
 from core import models, types
 
 
-def hash_model(config) -> str:
+def hash_model(config: object) -> str:
     # Convert to dict, dump as sorted JSON string
     model_json = json.dumps(strawberry.asdict(config), sort_keys=True)
     return hashlib.sha256(model_json.encode("utf-8")).hexdigest()

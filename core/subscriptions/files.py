@@ -18,7 +18,7 @@ class FileEvent:
 
 
 async def files(
-    self,
+    self: object,
     info: Info,
     dataset: strawberry.ID | None = None,
 ) -> AsyncGenerator[FileEvent, None]:

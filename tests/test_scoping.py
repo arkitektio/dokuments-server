@@ -68,8 +68,8 @@ LISTS = """
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
 async def test_lists_hold_only_the_callers_organization(
-    authenticated_context, other_org_context
-):
+    authenticated_context: HttpContext, other_org_context: HttpContext
+) -> None:
     await _make_document(authenticated_context, "mine", ["my page"])
     await _make_document(other_org_context, "theirs", ["their page"])
 
@@ -86,7 +86,9 @@ async def test_lists_hold_only_the_callers_organization(
 
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
-async def test_a_page_without_text_does_not_break_its_document(authenticated_context):
+async def test_a_page_without_text_does_not_break_its_document(
+    authenticated_context: HttpContext,
+) -> None:
     document = await _make_document(
         authenticated_context, "scan", ["first", None, "third"]
     )
@@ -106,8 +108,8 @@ async def test_a_page_without_text_does_not_break_its_document(authenticated_con
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
 async def test_documents_are_searched_by_title(
-    authenticated_context, other_org_context
-):
+    authenticated_context: HttpContext, other_org_context: HttpContext
+) -> None:
     await _make_document(authenticated_context, "Annual Report", ["a"])
     await _make_document(authenticated_context, "Invoice", ["b"])
     await _make_document(other_org_context, "Another report", ["c"])
@@ -123,8 +125,8 @@ async def test_documents_are_searched_by_title(
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
 async def test_file_events_go_to_the_files_organization(
-    authenticated_context, other_org_context
-):
+    authenticated_context: HttpContext, other_org_context: HttpContext
+) -> None:
     """A file's events reach its organization's group only, never a group every organization joins."""
     from core import channels
 
