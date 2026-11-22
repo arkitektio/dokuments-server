@@ -96,3 +96,23 @@ async def test_documents_are_searched_by_title(authenticated_context, other_org_
     data = await _data(authenticated_context, 'query { documents(filters: { search: "report" }) { title } }')
 
     assert [d["title"] for d in data["documents"]] == ["Annual Report"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_file_events_go_to_the_files_organization(authenticated_context, other_org_context):
+    """A file's events reach its organization's group only, never a group every organization joins."""
+    from core import channels
+
+    sent: list[tuple[object, list[str]]] = []
+    original = channels.file_channel.broadcast
+    channels.file_channel.broadcast = lambda message, groups=None: sent.append((message, groups))
+    try:
+        document = await _make_document(authenticated_context, "mine", ["a"])
+    finally:
+        channels.file_channel.broadcast = original
+
+    file_id = await sync_to_async(lambda: document.file_id)()
+    assert sent and all(groups == [channels.org_files_group(authenticated_context.request.organization.id)] for _, groups in sent)
+    assert any(message.create == file_id for message, _ in sent)
+    assert channels.org_files_group(other_org_context.request.organization.id) not in {group for _, groups in sent for group in groups}

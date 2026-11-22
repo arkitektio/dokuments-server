@@ -103,9 +103,11 @@ async def test_one_general_grant_reads_every_store_of_the_organization(authentic
     grant = (await _execute(authenticated_context, GENERAL, {})).data["requestGeneralMediaAccess"]
     s3 = _grant_client(grant, s3_endpoint)
     for store, body in ((first, b"page one"), (second, b"page two")):
-        key = (await _execute(authenticated_context, ACCESS, {"id": store})).data["requestMediaAccess"]["key"]
-        assert key.startswith(grant["prefix"])
-        assert s3.get_object(Bucket=grant["bucket"], Key=key)["Body"].read() == body
+        # Exactly what a client signs: the store's own bucket and key, as the schema reports them.
+        filed = (await _execute(authenticated_context, FILE, {"file": store})).data["fromFileLike"]
+        listed = (await _execute(authenticated_context, "query($id: ID!) { file(id: $id) { store { bucket key } } }", {"id": filed["id"]})).data["file"]["store"]
+        assert listed["key"].startswith(grant["prefix"])
+        assert s3.get_object(Bucket=listed["bucket"], Key=listed["key"])["Body"].read() == body
 
     their_key = (await _execute(other_org_context, ACCESS, {"id": theirs})).data["requestMediaAccess"]["key"]
     with pytest.raises(ClientError):
