@@ -13,9 +13,8 @@ provenance extension's `on_operation` hook is async, and a sync execution fails 
 import uuid
 
 import pytest
-from asgiref.sync import sync_to_async
-
 from arkitekt_datalayer.models import MediaStore
+from asgiref.sync import sync_to_async
 
 from core import models
 from dokuments_server.schema import schema
@@ -65,7 +64,9 @@ async def test_file_query_resolves_its_store(authenticated_context, make_file):
     file, store = await make_file(key)
 
     result = await schema.execute(
-        FILE_QUERY, variable_values={"id": str(file.id)}, context_value=authenticated_context
+        FILE_QUERY,
+        variable_values={"id": str(file.id)},
+        context_value=authenticated_context,
     )
 
     assert not result.errors, result.errors
@@ -85,8 +86,12 @@ async def test_document_and_pages_traverse_back_to_the_file(
     @sync_to_async
     def _make_doc():
         document = models.Document.objects.create(file=file, title="Scanned report")
-        models.Page.objects.create(document=document, index=0, content="page one", image=store)
-        models.Page.objects.create(document=document, index=1, content="page two", image=store)
+        models.Page.objects.create(
+            document=document, index=0, content="page one", image=store
+        )
+        models.Page.objects.create(
+            document=document, index=1, content="page two", image=store
+        )
         return document
 
     document = await _make_doc()

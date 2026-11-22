@@ -1,9 +1,11 @@
-from pydantic import BaseModel
 from typing import Literal, Union
+
+from pydantic import BaseModel
 
 
 class RenderNodeModel(BaseModel):
     kind: str
+
 
 class SplitNodeModel(RenderNodeModel):
     kind: Literal["split"]
@@ -28,7 +30,6 @@ class GridNodeModel(RenderNodeModel):
     children: list["RenderNodeUnion"]
     gap: int | None = None
     label: str | None = None
-
 
 
 RenderNodeUnion = Union[ContextNodeModel, OverlayNodeModel, GridNodeModel]

@@ -32,37 +32,58 @@ def _grant_client(grant: dict, endpoint: str):  # noqa: ANN202
 
 
 async def _execute(context, query: str, variables: dict, allow_errors: bool = False):  # noqa: ANN001, ANN202
-    result = await schema.execute(query, variable_values=variables, context_value=context)
+    result = await schema.execute(
+        query, variable_values=variables, context_value=context
+    )
     if not allow_errors:
         assert not result.errors, result.errors
     return result
 
 
 async def _upload(context, endpoint: str, body: bytes, name: str = "report.pdf") -> str:  # noqa: ANN001
-    grant = (await _execute(context, REQUEST, {"name": name, "size": len(body)})).data["requestMediaUpload"]
-    _grant_client(grant, endpoint).put_object(Bucket=grant["bucket"], Key=grant["key"], Body=body)
-    finished = (await _execute(context, FINISH, {"id": grant["store"]})).data["finishMediaUpload"]
+    grant = (await _execute(context, REQUEST, {"name": name, "size": len(body)})).data[
+        "requestMediaUpload"
+    ]
+    _grant_client(grant, endpoint).put_object(
+        Bucket=grant["bucket"], Key=grant["key"], Body=body
+    )
+    finished = (await _execute(context, FINISH, {"id": grant["store"]})).data[
+        "finishMediaUpload"
+    ]
     assert finished["sizeBytes"] == len(body)
     return grant["store"]
 
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
-async def test_a_file_is_uploaded_finished_and_filed(authenticated_context, s3_endpoint):
+async def test_a_file_is_uploaded_finished_and_filed(
+    authenticated_context, s3_endpoint
+):
     body = b"%PDF-1.4 not really a pdf, but bytes are bytes"
     store = await _upload(authenticated_context, s3_endpoint, body)
 
-    file = (await _execute(authenticated_context, FILE, {"file": store})).data["fromFileLike"]
+    file = (await _execute(authenticated_context, FILE, {"file": store})).data[
+        "fromFileLike"
+    ]
     assert file["name"] == "report.pdf" and file["store"]["id"] == store
 
-    access = (await _execute(authenticated_context, ACCESS, {"id": store})).data["requestMediaAccess"]
-    assert _grant_client(access, s3_endpoint).get_object(Bucket=access["bucket"], Key=access["key"])["Body"].read() == body
+    access = (await _execute(authenticated_context, ACCESS, {"id": store})).data[
+        "requestMediaAccess"
+    ]
+    assert (
+        _grant_client(access, s3_endpoint)
+        .get_object(Bucket=access["bucket"], Key=access["key"])["Body"]
+        .read()
+        == body
+    )
 
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_a_grant_writes_only_its_own_key(authenticated_context, s3_endpoint):
-    grant = (await _execute(authenticated_context, REQUEST, {"name": "a.pdf", "size": 3})).data["requestMediaUpload"]
+    grant = (
+        await _execute(authenticated_context, REQUEST, {"name": "a.pdf", "size": 3})
+    ).data["requestMediaUpload"]
     s3 = _grant_client(grant, s3_endpoint)
     with pytest.raises(ClientError):
         s3.put_object(Bucket=grant["bucket"], Key="someone-else", Body=b"x")
@@ -72,21 +93,39 @@ async def test_a_grant_writes_only_its_own_key(authenticated_context, s3_endpoin
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_an_unfinished_upload_cannot_be_filed(authenticated_context, s3_endpoint):
-    grant = (await _execute(authenticated_context, REQUEST, {"name": "a.pdf", "size": 3})).data["requestMediaUpload"]
-    refused = await _execute(authenticated_context, FILE, {"file": grant["store"]}, allow_errors=True)
+    grant = (
+        await _execute(authenticated_context, REQUEST, {"name": "a.pdf", "size": 3})
+    ).data["requestMediaUpload"]
+    refused = await _execute(
+        authenticated_context, FILE, {"file": grant["store"]}, allow_errors=True
+    )
     assert refused.errors and "has not been finished" in refused.errors[0].message
 
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
-async def test_another_organization_sees_neither_the_store_nor_the_file(authenticated_context, other_org_context, s3_endpoint):
+async def test_another_organization_sees_neither_the_store_nor_the_file(
+    authenticated_context, other_org_context, s3_endpoint
+):
     store = await _upload(authenticated_context, s3_endpoint, b"mine")
-    file = (await _execute(authenticated_context, FILE, {"file": store})).data["fromFileLike"]
+    file = (await _execute(authenticated_context, FILE, {"file": store})).data[
+        "fromFileLike"
+    ]
 
-    assert (await _execute(other_org_context, FILE, {"file": store}, allow_errors=True)).errors
-    assert (await _execute(other_org_context, ACCESS, {"id": store}, allow_errors=True)).errors
-    assert (await _execute(other_org_context, GET_FILE, {"id": file["id"]}, allow_errors=True)).errors
-    assert (await _execute(authenticated_context, GET_FILE, {"id": file["id"]})).data["file"]["id"] == file["id"]
+    assert (
+        await _execute(other_org_context, FILE, {"file": store}, allow_errors=True)
+    ).errors
+    assert (
+        await _execute(other_org_context, ACCESS, {"id": store}, allow_errors=True)
+    ).errors
+    assert (
+        await _execute(
+            other_org_context, GET_FILE, {"id": file["id"]}, allow_errors=True
+        )
+    ).errors
+    assert (await _execute(authenticated_context, GET_FILE, {"id": file["id"]})).data[
+        "file"
+    ]["id"] == file["id"]
 
 
 GENERAL = "mutation { requestGeneralMediaAccess(input: {}) { accessKey secretKey sessionToken bucket prefix } }"
@@ -94,21 +133,42 @@ GENERAL = "mutation { requestGeneralMediaAccess(input: {}) { accessKey secretKey
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
-async def test_one_general_grant_reads_every_store_of_the_organization(authenticated_context, other_org_context, s3_endpoint):
+async def test_one_general_grant_reads_every_store_of_the_organization(
+    authenticated_context, other_org_context, s3_endpoint
+):
     """What a client signs page images with: one grant per session, not one per store."""
-    first = await _upload(authenticated_context, s3_endpoint, b"page one", name="p1.png")
-    second = await _upload(authenticated_context, s3_endpoint, b"page two", name="p2.png")
+    first = await _upload(
+        authenticated_context, s3_endpoint, b"page one", name="p1.png"
+    )
+    second = await _upload(
+        authenticated_context, s3_endpoint, b"page two", name="p2.png"
+    )
     theirs = await _upload(other_org_context, s3_endpoint, b"not yours", name="p3.png")
 
-    grant = (await _execute(authenticated_context, GENERAL, {})).data["requestGeneralMediaAccess"]
+    grant = (await _execute(authenticated_context, GENERAL, {})).data[
+        "requestGeneralMediaAccess"
+    ]
     s3 = _grant_client(grant, s3_endpoint)
     for store, body in ((first, b"page one"), (second, b"page two")):
         # Exactly what a client signs: the store's own bucket and key, as the schema reports them.
-        filed = (await _execute(authenticated_context, FILE, {"file": store})).data["fromFileLike"]
-        listed = (await _execute(authenticated_context, "query($id: ID!) { file(id: $id) { store { bucket key } } }", {"id": filed["id"]})).data["file"]["store"]
+        filed = (await _execute(authenticated_context, FILE, {"file": store})).data[
+            "fromFileLike"
+        ]
+        listed = (
+            await _execute(
+                authenticated_context,
+                "query($id: ID!) { file(id: $id) { store { bucket key } } }",
+                {"id": filed["id"]},
+            )
+        ).data["file"]["store"]
         assert listed["key"].startswith(grant["prefix"])
-        assert s3.get_object(Bucket=listed["bucket"], Key=listed["key"])["Body"].read() == body
+        assert (
+            s3.get_object(Bucket=listed["bucket"], Key=listed["key"])["Body"].read()
+            == body
+        )
 
-    their_key = (await _execute(other_org_context, ACCESS, {"id": theirs})).data["requestMediaAccess"]["key"]
+    their_key = (await _execute(other_org_context, ACCESS, {"id": theirs})).data[
+        "requestMediaAccess"
+    ]["key"]
     with pytest.raises(ClientError):
         s3.get_object(Bucket=grant["bucket"], Key=their_key)

@@ -18,7 +18,9 @@ from django.db.models.signals import post_migrate
 from dokker import PortNotFoundError, testing
 
 # This file sits at the repo root, so the compose file is under tests/.
-COMPOSE = os.path.join(os.path.dirname(__file__), "tests", "integration", "docker-compose.yaml")
+COMPOSE = os.path.join(
+    os.path.dirname(__file__), "tests", "integration", "docker-compose.yaml"
+)
 
 #: Must match tests/integration/configs/rustfs.yaml and settings_test.
 ACCESS_KEY = "dokuments_access_key"
@@ -90,7 +92,12 @@ def _wait_for_rustfs(port: int, deadline: float) -> None:
         try:
             # RustFS's native health endpoint (it also serves MinIO's
             # /minio/health/live as a compat shim; prefer its own).
-            if urllib.request.urlopen(f"http://localhost:{port}/health", timeout=2).status == 200:
+            if (
+                urllib.request.urlopen(
+                    f"http://localhost:{port}/health", timeout=2
+                ).status
+                == 200
+            ):
                 return
         except (urllib.error.URLError, OSError, urllib.error.HTTPError):
             pass
@@ -141,9 +148,8 @@ def django_db_modify_db_settings(backend_stack):
 @pytest.fixture(scope="session", autouse=True)
 def s3_endpoint(backend_stack):
     """Point the service's datalayer at the object store's mapped port, and rebuild it."""
-    from django.conf import settings
-
     import arkitekt_datalayer.datalayer as dl_module
+    from django.conf import settings
 
     _, s3_port = backend_stack
     settings.DATALAYER = {**settings.DATALAYER, "port": s3_port}
@@ -173,7 +179,9 @@ def django_db_setup(django_db_setup, django_db_blocker):
         contenttypes = list(ContentType.objects.all())
         permissions = list(Permission.objects.all())
 
-    post_migrate.disconnect(dispatch_uid="django.contrib.auth.management.create_permissions")
+    post_migrate.disconnect(
+        dispatch_uid="django.contrib.auth.management.create_permissions"
+    )
     post_migrate.disconnect(create_contenttypes)
 
     def restore(sender, **kwargs):
@@ -182,7 +190,9 @@ def django_db_setup(django_db_setup, django_db_blocker):
         ContentType.objects.bulk_create(contenttypes, ignore_conflicts=True)
         Permission.objects.bulk_create(permissions, ignore_conflicts=True)
 
-    post_migrate.connect(restore, dispatch_uid="tests.restore_contenttypes_and_permissions")
+    post_migrate.connect(
+        restore, dispatch_uid="tests.restore_contenttypes_and_permissions"
+    )
     yield
 
     # Async tests run sync ORM code in asgiref's executor threads, whose connections

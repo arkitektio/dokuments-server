@@ -1,6 +1,7 @@
-from kante.types import Info
 import strawberry
-from core import types, models, scalars
+from kante.types import Info
+
+from core import models, scalars, types
 from core.mutations.file import organization_store
 from core.ocr.inputs import OCRPageResultInput
 
@@ -18,7 +19,15 @@ def create_page(
     info: Info,
     input: CreatePageInput,
 ) -> types.Page:
-    document = models.Document.objects.get(id=input.document, file__organization=info.context.request.organization)
-    page = models.Page.objects.create(index=input.index, document=document, image=organization_store(info, str(input.image)), ocr_result=strawberry.asdict(input.ocr_result), content=input.content)
+    document = models.Document.objects.get(
+        id=input.document, file__organization=info.context.request.organization
+    )
+    page = models.Page.objects.create(
+        index=input.index,
+        document=document,
+        image=organization_store(info, str(input.image)),
+        ocr_result=strawberry.asdict(input.ocr_result),
+        content=input.content,
+    )
 
     return page

@@ -10,8 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
-from pathlib import Path
 import os
+from pathlib import Path
+
 from .configuration import Settings
 from .logs import build_logging
 
@@ -82,7 +83,10 @@ CHANNEL_LAYERS = {
     "default": {
         # This example app uses the Redis channel layer implementation channels_redis
         "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {"hosts": [(conf.redis.host, conf.redis.port)], "prefix": conf.redis.channel_prefix},
+        "CONFIG": {
+            "hosts": [(conf.redis.host, conf.redis.port)],
+            "prefix": conf.redis.channel_prefix,
+        },
     },
 }
 

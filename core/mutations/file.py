@@ -23,11 +23,17 @@ def pin_file(
 def organization_store(info: Info, store_id: str) -> MediaStore:
     """The caller's organization's finished media store; another organization's is not found."""
     try:
-        store = MediaStore.objects.get(id=store_id, organization=info.context.request.organization)
+        store = MediaStore.objects.get(
+            id=store_id, organization=info.context.request.organization
+        )
     except MediaStore.DoesNotExist:
-        raise PermissionError(f"No media store {store_id} in your organization.") from None
+        raise PermissionError(
+            f"No media store {store_id} in your organization."
+        ) from None
     if not store.populated:
-        raise ValueError(f"Media store {store_id} has not been finished, so the file may still be arriving. Call `finishMediaUpload` once it is written.")
+        raise ValueError(
+            f"Media store {store_id} has not been finished, so the file may still be arriving. Call `finishMediaUpload` once it is written."
+        )
     return store
 
 
@@ -45,9 +51,13 @@ def from_file_like(
     store = organization_store(info, str(input.file))
 
     dataset = (
-        models.Dataset.objects.get(id=input.dataset, organization=info.context.request.organization)
+        models.Dataset.objects.get(
+            id=input.dataset, organization=info.context.request.organization
+        )
         if input.dataset
-        else models.Dataset.objects.get_current_default_for_user_and_organization(info.context.request.user, info.context.request.organization)
+        else models.Dataset.objects.get_current_default_for_user_and_organization(
+            info.context.request.user, info.context.request.organization
+        )
     )
 
     return models.File.objects.create(
@@ -68,5 +78,7 @@ def delete_file(
     info: Info,
     input: DeleteFileInput,
 ) -> strawberry.ID:
-    models.File.objects.get(id=input.id, organization=info.context.request.organization).delete()
+    models.File.objects.get(
+        id=input.id, organization=info.context.request.organization
+    ).delete()
     return input.id

@@ -1,10 +1,10 @@
 import strawberry
-from core import models
-from strawberry import auto
-from typing import Optional
-from strawberry_django.filters import FilterLookup
 import strawberry_django
 from django.contrib.postgres.search import SearchQuery
+from strawberry import auto
+from strawberry_django.filters import FilterLookup
+
+from core import models
 
 
 @strawberry.input
@@ -30,13 +30,13 @@ class SearchFilterMixin:
 @strawberry_django.filter(models.Dataset)
 class DatasetFilter:
     id: auto
-    name: Optional[FilterLookup[str]]
+    name: FilterLookup[str] | None
 
 
 @strawberry_django.filter(models.File)
 class FileFilter(IDFilterMixin, SearchFilterMixin):
     id: auto
-    name: Optional[FilterLookup[str]]
+    name: FilterLookup[str] | None
 
 
 @strawberry_django.filter(models.Document)

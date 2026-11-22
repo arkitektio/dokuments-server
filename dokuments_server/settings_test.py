@@ -35,7 +35,11 @@ AUTHENTIKATE = {
         for name, token in {
             "test": {"sub": "1", "roles": ["dokuments_editor"]},
             # A user in a different organization, for cross-tenant scoping tests.
-            "othertest": {"sub": "9", "org": "other_org", "roles": ["dokuments_editor"]},
+            "othertest": {
+                "sub": "9",
+                "org": "other_org",
+                "roles": ["dokuments_editor"],
+            },
             # An app granted only what it reads, for the scope tests (tests/test_scopes.py).
             "readertest": {"sub": "1", "scope": "openid dokuments_read"},
         }.items()

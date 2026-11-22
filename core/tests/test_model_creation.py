@@ -7,17 +7,18 @@ Previously this asserted a shape the models no longer have -- it created a
 nothing flagged the drift.
 """
 
+from arkitekt_datalayer.models import MediaStore
 from authentikate.models import Organization
 from django.contrib.auth import get_user_model
-
-from arkitekt_datalayer.models import MediaStore
 
 from core.models import Dataset, Document, File
 
 
 def test_create_dataset_file_and_document(db):
     """A Dataset -> File -> Document chain persists with its relations intact."""
-    user = get_user_model().objects.create_user(username="testuser", password="123456789")
+    user = get_user_model().objects.create_user(
+        username="testuser", password="123456789"
+    )
     org = Organization.objects.create(identifier="static_issuer#testorg")
 
     dataset = Dataset.objects.create(
@@ -27,7 +28,14 @@ def test_create_dataset_file_and_document(db):
         organization=org,
     )
 
-    store = MediaStore.objects.create(organization=org, key="abc", bucket="media", original_file_name="a.pdf", content_type="application/pdf", populated=True)
+    store = MediaStore.objects.create(
+        organization=org,
+        key="abc",
+        bucket="media",
+        original_file_name="a.pdf",
+        content_type="application/pdf",
+        populated=True,
+    )
     file = File.objects.create(
         name="a.pdf", dataset=dataset, store=store, creator=user, organization=org
     )

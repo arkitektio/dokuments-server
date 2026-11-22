@@ -1,9 +1,6 @@
-from pydantic import BaseModel, Field
 from uuid import uuid4
 
-
-
-
+from pydantic import BaseModel, Field
 
 
 class TreeNodeInputModel(BaseModel):
@@ -18,7 +15,6 @@ class TreeNodeInputModel(BaseModel):
 class TreeInputModel(BaseModel):
     id: str = "root"
     children: list[TreeNodeInputModel]
-
 
 
 class RenderTreeInputModel(BaseModel):

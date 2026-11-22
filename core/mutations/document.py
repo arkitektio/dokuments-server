@@ -1,8 +1,10 @@
-from kante.types import Info
-import strawberry
-from core import types, models
 import hashlib
 import json
+
+import strawberry
+from kante.types import Info
+
+from core import models, types
 
 
 def hash_model(config) -> str:
@@ -23,7 +25,9 @@ def create_document(
 ) -> types.Document:
     document = models.Document.objects.create(
         title=input.title,
-        file=models.File.objects.get(id=input.file, organization=info.context.request.organization),
+        file=models.File.objects.get(
+            id=input.file, organization=info.context.request.organization
+        ),
     )
 
     return document

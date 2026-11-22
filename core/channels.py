@@ -4,37 +4,33 @@ from pydantic import BaseModel
 
 class TraceSignal(BaseModel):
     """A model representing a base signal."""
+
     create: int | None = None
     update: int | None = None
     delete: int | None = None
-    
-    
+
+
 class RoiSignal(BaseModel):
     """A model representing a ROI signal."""
+
     create: int | None = None
     update: int | None = None
     delete: int | None = None
-    
-    
+
+
 class FileSignal(BaseModel):
     """A model representing a file signal."""
+
     create: int | None = None
     update: int | None = None
     delete: int | None = None
 
 
+trace_channel = build_channel(TraceSignal)
 
-trace_channel = build_channel(
-    TraceSignal
-)
+roi_channel = build_channel(RoiSignal)
 
-roi_channel = build_channel(
-    RoiSignal
-)
-
-file_channel = build_channel(
-    FileSignal
-)
+file_channel = build_channel(FileSignal)
 
 
 def org_files_group(organization_id: object) -> str:

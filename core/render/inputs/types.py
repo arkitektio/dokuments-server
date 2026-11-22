@@ -1,8 +1,9 @@
+from strawberry import LazyType
+from strawberry.experimental import pydantic
+
 from core.render.enums import RenderNodeKind
 from core.render.inputs import models
-from strawberry.experimental import pydantic
-from strawberry import LazyType
-from typing import Optional
+
 
 @pydantic.input(models.TreeNodeInputModel)
 class TreeNodeInput:
@@ -19,17 +20,16 @@ class TreeNodeInput:
     Return Widgets provide more a way to customize this overwriten behavior.
 
     """
+
     kind: RenderNodeKind
     label: str | None = None
     context: str | None = None
     gap: int | None = None
-    children: Optional[list[LazyType["TreeNodeInput", __name__]]] = None
-
+    children: list[LazyType["TreeNodeInput", __name__]] | None = None
 
 
 @pydantic.input(models.TreeInputModel)
 class TreeInput:
-
     id: str | None = "root"
     children: list[TreeNodeInput]
 

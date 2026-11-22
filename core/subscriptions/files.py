@@ -1,9 +1,10 @@
 import logging
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import strawberry
 from kante.types import Info
-from core import models, types, channels
+
+from core import channels, models, types
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 class FileEvent:
     create: types.File | None = None
     delete: strawberry.ID | None = None
-    update: types.File    | None = None
+    update: types.File | None = None
     moved: types.File | None = None
 
 
@@ -31,7 +32,9 @@ async def files(
     if dataset is not None:
         in_scope = in_scope.filter(dataset_id=dataset)
 
-    async for message in channels.file_channel.listen(info.context, [channels.org_files_group(organization.id)]):
+    async for message in channels.file_channel.listen(
+        info.context, [channels.org_files_group(organization.id)]
+    ):
         logger.debug("File channel message: %s", message)
         if message.delete:
             yield FileEvent(delete=strawberry.ID(str(message.delete)))

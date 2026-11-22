@@ -1,7 +1,8 @@
 from django.db import transaction
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
-from core import models, channels
+
+from core import channels, models
 
 
 def _broadcast_file(signal: channels.FileSignal, file: models.File) -> None:

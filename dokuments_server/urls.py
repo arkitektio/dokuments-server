@@ -14,13 +14,13 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.contrib import admin
-from django.http import HttpRequest, HttpResponse
-from kante.path import dynamicpath
 
 from arkitekt_service.service.views import answers_challenge
-from health_check.views import MainView
+from django.contrib import admin
+from django.http import HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from health_check.views import MainView
+from kante.path import dynamicpath
 
 
 def graphql_schema(request: HttpRequest) -> HttpResponse:
@@ -33,5 +33,7 @@ def graphql_schema(request: HttpRequest) -> HttpResponse:
 urlpatterns = [
     dynamicpath("admin/", admin.site.urls),
     dynamicpath("schema", graphql_schema),
-    dynamicpath("ht", answers_challenge(csrf_exempt(MainView.as_view())), name="health_check"),
+    dynamicpath(
+        "ht", answers_challenge(csrf_exempt(MainView.as_view())), name="health_check"
+    ),
 ]

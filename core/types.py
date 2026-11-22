@@ -1,14 +1,15 @@
-import strawberry
-import strawberry_django
-from strawberry import auto
-from typing import Optional
-from django.db.models import QuerySet
-from kante.types import Info
-from core import models, filters
 import datetime
 from enum import Enum
+
+import strawberry
+import strawberry_django
 from arkitekt_datalayer import types as dtypes
 from authentikate.strawberry.types import User
+from django.db.models import QuerySet
+from kante.types import Info
+from strawberry import auto
+
+from core import filters, models
 from core.ocr.object import OCRPageResult, OCRPageResultModel
 
 
@@ -45,7 +46,9 @@ class File:
     )
 
     @classmethod
-    def get_queryset(cls, queryset: QuerySet[models.File], info: Info, **kwargs: object) -> QuerySet[models.File]:
+    def get_queryset(
+        cls, queryset: QuerySet[models.File], info: Info, **kwargs: object
+    ) -> QuerySet[models.File]:
         return scope_to_organization(queryset, info, "organization")
 
 
@@ -60,22 +63,28 @@ class Dataset:
     pinned: bool = strawberry.field(description="Whether the dataset is pinned.")
 
 
-@strawberry_django.type(models.Document, filters=filters.DocumentFilter, pagination=True)
+@strawberry_django.type(
+    models.Document, filters=filters.DocumentFilter, pagination=True
+)
 class Document:
     """Document type."""
 
     id: strawberry.ID
     file: "File"
     title: str
-    processed_at: Optional[str]
-    pages: list["Page"] = strawberry_django.field(description="The document's pages, in reading order (by index).")
+    processed_at: str | None
+    pages: list["Page"] = strawberry_django.field(
+        description="The document's pages, in reading order (by index)."
+    )
 
     @strawberry_django.field(description="How many pages the document has.")
     def page_count(self, root: models.Document) -> int:
         return root.pages.count()
 
     @classmethod
-    def get_queryset(cls, queryset: QuerySet[models.Document], info: Info, **kwargs: object) -> QuerySet[models.Document]:
+    def get_queryset(
+        cls, queryset: QuerySet[models.Document], info: Info, **kwargs: object
+    ) -> QuerySet[models.Document]:
         return scope_to_organization(queryset, info, "file__organization")
 
 
@@ -85,7 +94,9 @@ class Page:
     document: "Document"
     index: int
     image: dtypes.MediaStore
-    content: str | None = strawberry.field(description="The content of the page as a flat string. Null when no text was recognised on it.")
+    content: str | None = strawberry.field(
+        description="The content of the page as a flat string. Null when no text was recognised on it."
+    )
 
     @strawberry_django.field
     def ocr_result(self) -> OCRPageResult | None:
@@ -95,6 +106,10 @@ class Page:
         return None
 
     @classmethod
-    def get_queryset(cls, queryset: QuerySet[models.Page], info: Info, **kwargs: object) -> QuerySet[models.Page]:
+    def get_queryset(
+        cls, queryset: QuerySet[models.Page], info: Info, **kwargs: object
+    ) -> QuerySet[models.Page]:
         # Reading order: a document's pages by index (nested), and across documents by document.
-        return scope_to_organization(queryset, info, "document__file__organization").order_by("document_id", "index", "id")
+        return scope_to_organization(
+            queryset, info, "document__file__organization"
+        ).order_by("document_id", "index", "id")

@@ -2,7 +2,6 @@ from typing import NewType
 
 import strawberry
 
-
 FileLike = strawberry.scalar(
     NewType("FileLike", str),
     description="The `FileLike` scalar type represents a reference to a big file"
@@ -10,5 +9,3 @@ FileLike = strawberry.scalar(
     serialize=lambda v: v,
     parse_value=lambda v: v,
 )
-
-

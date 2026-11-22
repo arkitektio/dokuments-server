@@ -1,5 +1,6 @@
-import strawberry
 from enum import Enum
+
+import strawberry
 
 
 @strawberry.enum
@@ -8,5 +9,3 @@ class RenderNodeKind(str, Enum):
     OVERLAY = "overlay"
     GRID = "grid"
     SPIT = "split"
-
-

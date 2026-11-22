@@ -35,11 +35,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "basedpyright>=1.39.8",
+    "basedpyright==1.40.2",
     "pytest-cov>=7.1.0",
     "python-semantic-release>=9.21.0",
     "django-stubs>=5.2.0",
-    "mypy>=1.15.0",
     # Integration stack: dokker brings up the compose file, psycopg waits on the
     # database, requests drives presigned POST/GET at the object store. No moto --
     # the suite talks to a real RustFS container instead of mocking S3.
@@ -48,57 +47,13 @@ dev = [
     "pytest-asyncio>=1.1.0",
     "pytest-django>=4.11.1",
     "requests>=2.32",
+    "ruff==0.17.6",
 ]
-
-[tool.django-stubs]
-django_settings_module = "dokuments_server.settings"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "dokuments_server.settings_test"
 # The schema's koherent extension hooks are async, so the GraphQL tests must be too.
 asyncio_mode = "auto"
-
-
-[tool.ruff]
-# Enable the pycodestyle (`E`) and Pyflakes (`F`) rules by default.
-# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
-# McCabe complexity (`C901`) by default.
-extend-select = ["ANN", "D1"]
-extend-ignore = [ "ANN002", "ANN003", "D100", "ANN401"]
-
-# Exclude a variety of commonly ignored directories.
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
-    "tests",
-    "examples",
-    "**/migrations",
-]
-
-# Same as Black.
-line-length = 300
-
-
-# Assume Python 3.12.
-target-version = "py312"
 
 
 [tool.semantic_release]
@@ -146,8 +101,3 @@ exclude_commit_patterns = [
 
 
 
-[tool.mypy]
-exclude = ["venv/", "tests/", "examples/"]
-plugins = ["mypy_django_plugin.main","pydantic.mypy"]
-ignore_missing_imports = true
-strict = true

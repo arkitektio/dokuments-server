@@ -1,7 +1,9 @@
-from kante.types import Info
-import strawberry
-from core import types, models
 from typing import cast
+
+import strawberry
+from kante.types import Info
+
+from core import models, types
 
 
 @strawberry.input
@@ -69,4 +71,3 @@ def update_dataset(
     view.name = input.name
     view.save()
     return view
-
