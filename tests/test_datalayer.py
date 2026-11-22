@@ -87,3 +87,26 @@ async def test_another_organization_sees_neither_the_store_nor_the_file(authenti
     assert (await _execute(other_org_context, ACCESS, {"id": store}, allow_errors=True)).errors
     assert (await _execute(other_org_context, GET_FILE, {"id": file["id"]}, allow_errors=True)).errors
     assert (await _execute(authenticated_context, GET_FILE, {"id": file["id"]})).data["file"]["id"] == file["id"]
+
+
+GENERAL = "mutation { requestGeneralMediaAccess(input: {}) { accessKey secretKey sessionToken bucket prefix } }"
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_one_general_grant_reads_every_store_of_the_organization(authenticated_context, other_org_context, s3_endpoint):
+    """What a client signs page images with: one grant per session, not one per store."""
+    first = await _upload(authenticated_context, s3_endpoint, b"page one", name="p1.png")
+    second = await _upload(authenticated_context, s3_endpoint, b"page two", name="p2.png")
+    theirs = await _upload(other_org_context, s3_endpoint, b"not yours", name="p3.png")
+
+    grant = (await _execute(authenticated_context, GENERAL, {})).data["requestGeneralMediaAccess"]
+    s3 = _grant_client(grant, s3_endpoint)
+    for store, body in ((first, b"page one"), (second, b"page two")):
+        key = (await _execute(authenticated_context, ACCESS, {"id": store})).data["requestMediaAccess"]["key"]
+        assert key.startswith(grant["prefix"])
+        assert s3.get_object(Bucket=grant["bucket"], Key=key)["Body"].read() == body
+
+    their_key = (await _execute(other_org_context, ACCESS, {"id": theirs})).data["requestMediaAccess"]["key"]
+    with pytest.raises(ClientError):
+        s3.get_object(Bucket=grant["bucket"], Key=their_key)
