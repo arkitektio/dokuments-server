@@ -5,7 +5,18 @@ from django.db import models
 from koherent.fields import ProvenanceField
 from taggit.managers import TaggableManager
 
-# Create your models here.
+
+def created_through() -> models.ForeignKey:
+    """The task (koherent's) an object was created through, if a workflow created it: what
+    ``shareWorkflow`` and the ``createdUnder`` filters read."""
+    return models.ForeignKey(
+        "koherent.Task",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_%(class)ss",
+        help_text="The task this object was created through, if any",
+    )
 
 
 class DatasetManager(models.Manager):
@@ -110,12 +121,14 @@ class File(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     creator = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, null=True)
+    created_through = created_through()
 
 
 class Document(models.Model):
     file = models.ForeignKey(File, on_delete=models.CASCADE, related_name="documents")
     title = models.CharField(max_length=255, blank=True)
     processed_at = models.DateTimeField(null=True, blank=True)
+    created_through = created_through()
 
 
 class Page(models.Model):
@@ -131,6 +144,7 @@ class Page(models.Model):
         help_text="The page's image: a media store of the document's organization.",
     )
     ocr_result = models.JSONField(null=True, blank=True)
+    created_through = created_through()
 
     def get_text(self) -> str:
         """Concatenate recognized lines into full-page text"""

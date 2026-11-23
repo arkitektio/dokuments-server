@@ -3,6 +3,7 @@ import json
 
 import strawberry
 from kante.types import Info
+from koherent.utils import get_or_create_task
 
 from core import models, types
 
@@ -28,6 +29,7 @@ def create_document(
         file=models.File.objects.get(
             id=input.file, organization=info.context.request.organization
         ),
+        created_through=get_or_create_task(),
     )
 
     return document

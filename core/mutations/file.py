@@ -3,6 +3,7 @@
 import strawberry
 from arkitekt_datalayer.models import MediaStore
 from kante.types import Info
+from koherent.utils import get_or_create_task
 
 from core import models, scalars, types
 
@@ -66,6 +67,7 @@ def from_file_like(
         organization=info.context.request.organization,
         name=store.original_file_name or store.key,
         store=store,
+        created_through=get_or_create_task(),
     )
 
 

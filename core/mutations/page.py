@@ -1,5 +1,6 @@
 import strawberry
 from kante.types import Info
+from koherent.utils import get_or_create_task
 
 from core import models, scalars, types
 from core.mutations.file import organization_store
@@ -28,6 +29,7 @@ def create_page(
         image=organization_store(info, str(input.image)),
         ocr_result=strawberry.asdict(input.ocr_result),
         content=input.content,
+        created_through=get_or_create_task(),
     )
 
     return page
