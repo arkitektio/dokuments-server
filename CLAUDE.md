@@ -11,6 +11,17 @@ files it with `fromFileLike` (or names it as a page's `image`). Reads go through
 `requestMediaAccess`; there are no presigned URLs. Every lookup -- stores, files, documents,
 pages -- is scoped to the caller's organization.
 
+## Sharing
+
+dokuments lets guests of an organization in (`arkitekt_service.collaborations`): a full member puts a
+file in a collaboration (lok's, by key; `addToCollaboration`, `shareWorkflow`, behind `dokuments_share`),
+and its documents and pages are in it with it; its bytes and its pages' images come along
+(`dokuments_server/service.py`). Every read goes through `core/scoping.py` (organization, then a
+guest's collaborations at a root field); the `CollaborationGate` holds nested reads. A guest writes
+nothing; `requestMediaAccess` is open to them for stores in their collaborations only, and every
+other mutation and the `files` subscription refuse them. A new route outside GraphQL that takes a
+bearer token must refuse guests (`authentikate.scoped.require_full_member`).
+
 ## Migrations and jobs
 
 A container of this image only serves. An installer (konstruktor) prepares the database with

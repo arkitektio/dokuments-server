@@ -44,6 +44,27 @@ AUTHENTIKATE = {
             "readertest": {"sub": "1", "scope": "openid dokuments_read"},
         }.items()
     },
+    # A rekuest that signs task tokens with tests/fixtures/provenance_key.json: what a file, a
+    # document or a page records as the task it was created through (tests/test_share_workflow.py).
+    "provenance": {
+        "issuers": [
+            {
+                "iss": "rekuest",
+                "kind": "jwks_dict",
+                "jwks": {
+                    "keys": [
+                        {
+                            "crv": "Ed25519",
+                            "x": "fKuuMPq_8srNDVVTS8nPQvPTBYuiTAke-EvT0GW-la8",
+                            "kty": "OKP",
+                            "kid": "dokuments-test-provenance",
+                        }
+                    ]
+                },
+            }
+        ],
+        "audience": "*",
+    },
 }
 
 # --- object storage -------------------------------------------------------------

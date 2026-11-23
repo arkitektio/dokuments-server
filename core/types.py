@@ -11,6 +11,7 @@ from strawberry import auto
 
 from core import filters, models
 from core.ocr.object import OCRPageResult, OCRPageResultModel
+from core.scoping import scope_queryset
 
 
 @strawberry.enum
@@ -27,15 +28,6 @@ class ViewKind(str, Enum):
     TIMEPOINT = "timepoint_views"
 
 
-def scope_to_organization(queryset: QuerySet, info: Info, path: str) -> QuerySet:
-    """Keep only the rows of the caller's organization, reached through ``path``.
-
-    strawberry_django runs a type's ``get_queryset`` for root lists, single ``x: T = field()``
-    fetches and nested relations alike, so routing every type here scopes every read of it.
-    """
-    return queryset.filter(**{path: info.context.request.organization})
-
-
 @strawberry_django.type(models.File, filters=filters.FileFilter, pagination=True)
 class File:
     id: auto
@@ -49,7 +41,7 @@ class File:
     def get_queryset(
         cls, queryset: QuerySet[models.File], info: Info, **kwargs: object
     ) -> QuerySet[models.File]:
-        return scope_to_organization(queryset, info, "organization")
+        return scope_queryset(queryset, info)
 
 
 @strawberry_django.type(models.Dataset, filters=filters.DatasetFilter, pagination=True)
@@ -85,7 +77,7 @@ class Document:
     def get_queryset(
         cls, queryset: QuerySet[models.Document], info: Info, **kwargs: object
     ) -> QuerySet[models.Document]:
-        return scope_to_organization(queryset, info, "file__organization")
+        return scope_queryset(queryset, info)
 
 
 @strawberry_django.type(models.Page, filters=filters.PageFilter, pagination=True)
@@ -110,6 +102,4 @@ class Page:
         cls, queryset: QuerySet[models.Page], info: Info, **kwargs: object
     ) -> QuerySet[models.Page]:
         # Reading order: a document's pages by index (nested), and across documents by document.
-        return scope_to_organization(
-            queryset, info, "document__file__organization"
-        ).order_by("document_id", "index", "id")
+        return scope_queryset(queryset, info).order_by("document_id", "index", "id")

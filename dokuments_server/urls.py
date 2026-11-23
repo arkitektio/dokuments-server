@@ -22,6 +22,8 @@ from django.views.decorators.csrf import csrf_exempt
 from health_check.views import MainView
 from kante.path import dynamicpath
 
+from dokuments_server.service import service as rekuest_service
+
 
 def graphql_schema(request: HttpRequest) -> HttpResponse:
     """The schema as SDL, readable without a login (clients generate and validate against it)."""
@@ -36,4 +38,7 @@ urlpatterns = [
     dynamicpath(
         "ht", answers_challenge(csrf_exempt(MainView.as_view())), name="health_check"
     ),
+    # What this service hosts, read by the hub's rekuest (internal network only, signed). It
+    # answers 503 until the service is configured to reach rekuest.
+    *rekuest_service.urls,
 ]

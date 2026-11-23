@@ -1,5 +1,6 @@
 import strawberry
 import strawberry_django
+from arkitekt_service.collaborations.filters import SharingFilterMixin
 from django.contrib.postgres.search import SearchQuery
 from django.db.models import QuerySet
 from kante.types import Info
@@ -36,13 +37,13 @@ class DatasetFilter:
 
 
 @strawberry_django.filter(models.File)
-class FileFilter(IDFilterMixin, SearchFilterMixin):
+class FileFilter(IDFilterMixin, SearchFilterMixin, SharingFilterMixin):
     id: auto
     name: FilterLookup[str] | None
 
 
 @strawberry_django.filter(models.Document)
-class DocumentFilter(IDFilterMixin):
+class DocumentFilter(IDFilterMixin, SharingFilterMixin):
     id: auto
     search: str | None
 
@@ -54,7 +55,7 @@ class DocumentFilter(IDFilterMixin):
 
 
 @strawberry_django.filter(models.Page)
-class PageFilter(IDFilterMixin):
+class PageFilter(IDFilterMixin, SharingFilterMixin):
     id: auto
     search: str | None
 

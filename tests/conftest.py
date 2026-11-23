@@ -2,8 +2,60 @@
 ``conftest.py`` so that ``core/tests/`` gets them too.
 """
 
+from collections.abc import Callable, Iterator, Mapping
+
 import pytest
-from kante.context import HttpContext
+from authentikate import settings as authentikate_settings
+from kante.context import HttpContext, UniversalRequest
+from pytest_django.fixtures import Settings as SettingsWrapper
+from strawberry.http.temporal_response import TemporalResponse
+
+#: ``guest({key: roles})``: a request presenting a guest granted those collaborations.
+GuestFactory = Callable[[Mapping[str, list[str]]], HttpContext]
+
+
+def token_context(token: str, task: str | None = None) -> HttpContext:
+    """A request presenting the static token ``token``, as a client sends it: nothing resolved yet.
+
+    ``task`` is a provenance token, sent in the ``Rekuest-Task`` header as an agent does for the
+    task it runs.
+    """
+    headers = {"Authorization": f"Bearer {token}"}
+    if task is not None:
+        headers["Rekuest-Task"] = task
+    return HttpContext(
+        request=UniversalRequest(_extensions={}),
+        response=TemporalResponse(),
+        headers=headers,
+        type="http",
+    )
+
+
+@pytest.fixture
+def guest(
+    db: None, authenticated_context: HttpContext, settings: SettingsWrapper
+) -> Iterator[GuestFactory]:
+    """``guest({key: roles})``: a context presenting a guest of the test organization (sub 20),
+    granted those collaborations by their key, as lok lists them in the token's ``collabs``."""
+
+    def mint(collaborations: Mapping[str, list[str]]) -> HttpContext:
+        settings.AUTHENTIKATE = {
+            **settings.AUTHENTIKATE,
+            "static_tokens": {
+                **settings.AUTHENTIKATE["static_tokens"],
+                "guest": {
+                    "sub": "20",
+                    "roles": [],
+                    "collabs": dict(collaborations),
+                    "scope": "openid dokuments_all",
+                },
+            },
+        }
+        authentikate_settings.cached_settings = None
+        return token_context("guest")
+
+    yield mint
+    authentikate_settings.cached_settings = None
 
 
 def _context(token: str, sub: str, org_slug: str) -> HttpContext:

@@ -1,0 +1,7 @@
+{
+  "crv": "Ed25519",
+  "x": "fKuuMPq_8srNDVVTS8nPQvPTBYuiTAke-EvT0GW-la8",
+  "d": "tDLxomuYfkEaIo2DBamapE-bHjIbx6DLVlHXw8Hx4k4",
+  "kid": "dokuments-test-provenance",
+  "kty": "OKP"
+}

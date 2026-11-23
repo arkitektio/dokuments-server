@@ -12,12 +12,14 @@ from arkitekt_service.contract import (
     Contract,
     Description,
     Facts,
+    Hosts,
     Job,
     Needs,
     Offers,
     Role,
     Scope,
     Start,
+    Structure,
     blocks,
 )
 
@@ -35,6 +37,10 @@ SCOPES = [
         description="Upload documents and add or change their pages and text.",
     ),
     Scope(
+        key="dokuments_share",
+        description="Share documents with people outside your organization through collaborations.",
+    ),
+    Scope(
         key="dokuments_all",
         description="Do everything in Dokuments on your behalf.",
         is_all_scope=True,
@@ -50,7 +56,7 @@ ROLES = [
     ),
     Role(
         key="dokuments_editor",
-        description="Upload and change documents.",
+        description="Upload and change documents, and share them.",
         is_default_role=True,
     ),
 ]
@@ -58,6 +64,29 @@ ROLES = [
 #: The role every write asks for.
 EDITOR = "dokuments_editor"
 ADMIN = "dokuments_admin"
+
+
+#: What dokuments hosts, as the hub knows it: a file is put in a collaboration, and its documents
+#: and their pages come along with it. Bound to the models in ``dokuments_server/service.py``.
+HOSTS = Hosts(
+    structures=[
+        Structure(
+            identifier="@dokuments/file",
+            label="File",
+            description="An uploaded file, such as a PDF or a scanned document, kept as it was uploaded.",
+        ),
+        Structure(
+            identifier="@dokuments/document",
+            label="Document",
+            description="A document read from an uploaded file: its title and its pages, in reading order.",
+        ),
+        Structure(
+            identifier="@dokuments/page",
+            label="Page",
+            description="One page of a document: its image, the text recognised on it (OCR) and where each line was found.",
+        ),
+    ],
+)
 
 
 def render(facts: Facts) -> dict[str, JSON]:
@@ -74,6 +103,7 @@ contract = Contract(
         summary="Documents, their pages and their text.",
         needs=Needs(scopes=SCOPES, roles=ROLES, storage=["media"]),
         offers=Offers(),
+        hosts=HOSTS,
     ),
     settings=Settings,
     render=render,

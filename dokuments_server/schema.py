@@ -5,8 +5,12 @@ import strawberry_django
 from arkitekt_datalayer import mutations as datalayer_mutations
 from arkitekt_datalayer import scalars as datalayer_scalars
 from arkitekt_datalayer.datalayer import load_config
-from arkitekt_service.graphql import TelemetryExtension
-from authentikate.catch_alls import declare_catch_alls
+from arkitekt_service.collaborations import graphql as collaboration_types
+from arkitekt_service.graphql import (
+    CollaborationGate,
+    TelemetryExtension,
+    annotate_schema,
+)
 from authentikate.strawberry import AuthExtension, AuthSubscribeExtension
 from authentikate.strawberry.extension import AuthentikateExtension
 from kante.types import Info
@@ -15,9 +19,10 @@ from strawberry import ID as StrawberryID
 from strawberry.schema.config import StrawberryConfig
 from strawberry_django.optimizer import DjangoOptimizerExtension
 
-from core import models, mutations, subscriptions, types
-from dokuments_server.contract import EDITOR, contract
+from core import access, models, mutations, scoping, subscriptions, types
+from dokuments_server.contract import EDITOR
 from dokuments_server.logs import QuietErrorsSchema
+from dokuments_server.service import service as dokuments_service
 
 ID = Annotated[
     StrawberryID, strawberry.argument(description="The unique identifier of an object")
@@ -40,11 +45,21 @@ def mutation(
     )
 
 
-def access_mutation(**kwargs: Any) -> Any:  # noqa: ANN401 - as strawberry_django's: the value of `x: T = field()`
-    """A mutation that hands out read credentials: a read, for whoever may see what it reads."""
+def access_mutation(guests: bool = False, **kwargs: Any) -> Any:  # noqa: ANN401 - as strawberry_django's: the value of `x: T = field()`
+    """A mutation that hands out read credentials: a read, for whoever may see what it reads.
+
+    ``guests`` lets guests of the organization in: the resolver then finds only what is in their
+    collaborations. Every other one refuses a guest (authentikate's ``SCOPED_READ_ONLY``)."""
     return strawberry_django.mutation(
-        extensions=[AuthExtension(scopes=["dokuments_read"])], **kwargs
+        extensions=[AuthExtension(scopes=["dokuments_read"], allow_scoped=guests)],
+        **kwargs,
     )
+
+
+#: The collaborations of dokuments' files, which a guest of the organization is granted.
+collaboration_api = collaboration_types.resolvers(
+    fetch=lambda model, id, info: scoping.get_for_org(model, info, id)
+)
 
 
 def subscription(**kwargs: Any) -> Any:  # noqa: ANN401 - as strawberry_django's: the value of `x: T = field()`
@@ -62,21 +77,28 @@ class Query:
 
     @field(permission_classes=[])
     def file(self, info: Info, id: ID) -> types.File:
-        return models.File.objects.get(
-            id=id, organization=info.context.request.organization
-        )
+        return scoping.get_for_org(models.File, info, id)
 
     @field(permission_classes=[])
     def document(self, info: Info, id: ID) -> types.Document:
-        return models.Document.objects.get(
-            id=id, file__organization=info.context.request.organization
-        )
+        return scoping.get_for_org(models.Document, info, id)
 
     @field(permission_classes=[])
     def page(self, info: Info, id: ID) -> types.Page:
-        return models.Page.objects.get(
-            id=id, document__file__organization=info.context.request.organization
-        )
+        return scoping.get_for_org(models.Page, info, id)
+
+    collaborations: list[collaboration_types.Collaboration] = field(
+        resolver=collaboration_api.collaborations,
+        description="List the organization's collaborations that hold something of dokuments (a guest: the collaborations granted to them)",
+    )
+    collaboration: collaboration_types.Collaboration = field(
+        resolver=collaboration_api.collaboration,
+        description="Get a single collaboration by its key (lok's): what was put in it here",
+    )
+    collaborations_stats: collaboration_types.CollaborationStats = field(
+        resolver=collaboration_api.collaborations_stats,
+        description="Count the collaborations `collaborations` lists, and the objects in them",
+    )
 
 
 def upload_mutation(**kwargs: Any) -> Any:  # noqa: ANN401 - as strawberry_django's: the value of `x: T = field()`
@@ -105,8 +127,9 @@ class Mutation:
         resolver=datalayer_mutations.refresh_media_upload,
     )
     request_media_access = access_mutation(
-        resolver=datalayer_mutations.request_media_access,
-        description="Request temporary S3 read credentials for an uploaded file.",
+        guests=True,
+        resolver=access.request_media_access,
+        description="Request temporary S3 read credentials for an uploaded file (a file's bytes, or a page's image). A guest of the organization gets them only for what is in one of their collaborations.",
     )
     request_general_media_access = access_mutation(
         resolver=datalayer_mutations.request_general_media_access,
@@ -132,6 +155,33 @@ class Mutation:
         resolver=mutations.create_page, description="Create a new page in a document"
     )
 
+    # --- Collaborations ----------------------------------------------------
+    add_to_collaboration = mutation(
+        scope="dokuments_share",
+        resolver=collaboration_api.add_to_collaboration,
+        description="Put a file in a collaboration (lok's, by its key), with its bytes and its pages' images: its documents and their pages are in it with it. The collaboration's row here is made the first time something is put in",
+    )
+    add_many_to_collaboration = mutation(
+        scope="dokuments_share",
+        resolver=collaboration_api.add_many_to_collaboration,
+        description="Put several files in a collaboration (by its key) at once, each with what it needs to be seen: all of them, or none",
+    )
+    share_workflow = mutation(
+        scope="dokuments_share",
+        resolver=collaboration_api.share_workflow,
+        description="Put what a workflow (its root task) created in dokuments in a collaboration, as it is now: what it makes later is not. A document or page made in the workflow for a file made before it, and not shared, is left out and reported; `dryRun` only says what would be put in",
+    )
+    remove_from_collaboration = mutation(
+        scope="dokuments_share",
+        resolver=collaboration_api.remove_from_collaboration,
+        description="Take a file out of a collaboration, with what it brought that nothing else there needs",
+    )
+    delete_collaboration = mutation(
+        scope="dokuments_share",
+        resolver=collaboration_api.delete_collaboration,
+        description="Take everything dokuments put in a collaboration (by its key) out of it: whoever was granted it sees nothing of it here any more. lok's collaboration, and its grants, stay",
+    )
+
 
 @strawberry.type
 class Subscription:
@@ -153,16 +203,16 @@ schema = Schema(
     mutation=Mutation,
     extensions=[
         TelemetryExtension,
-        KoherentExtension,
         AuthentikateExtension,
+        # A guest of the organization is handed only what is in their collaborations.
+        CollaborationGate,
+        KoherentExtension,
         DjangoOptimizerExtension,
     ],
     config=StrawberryConfig(scalar_map={**datalayer_scalars.SCALAR_MAP}),
     types=[],
 )
 
-# What stands for every scope and role here (`dokuments_all`, `dokuments_admin`). dokuments has no
-# hub structures, so no `annotate_schema`: the contract's catch-alls are declared directly.
-declare_catch_alls(
-    scope=contract.description.all_scope, role=contract.description.admin_role
-)
+# Which structure each type is (`@identified`), what stands for every scope and role here
+# (`dokuments_all`, `dokuments_admin`), and, behind the gate, that dokuments lets guests in.
+annotate_schema(schema, dokuments_service)
